@@ -1,0 +1,29 @@
+# dependencies
+node_modules/
+/node_modules/
+cybersecurity-web-app-design/node_modules/
+
+# Next.js build output
+.next/
+/.next/
+cybersecurity-web-app-design/.next/
+
+# Production build output
+build/
+dist/
+
+# Local env files
+.env*.local
+
+# Local mock DB
+mock_db.json
+cybersecurity-web-app-design/mock_db.json
+
+# IDE config files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

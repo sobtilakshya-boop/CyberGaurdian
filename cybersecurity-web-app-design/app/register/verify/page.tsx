@@ -117,7 +117,9 @@ export default function VerifyPage() {
         setStatus("success")
         setMessage("Identity verified. Account created successfully!")
         sessionStorage.removeItem("cg_pending_phone")
-        setTimeout(() => router.push("/"), 2500)
+        sessionStorage.removeItem("cg_pending_name")
+        sessionStorage.removeItem("cg_pending_email")
+        setTimeout(() => router.push("/dashboard"), 2000)
       } else {
         setStatus("error")
         setMessage(data.error ?? "Verification failed. Please try again.")
