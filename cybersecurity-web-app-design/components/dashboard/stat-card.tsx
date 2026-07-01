@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
-import { ShieldCheck, Users, AlertOctagon, Activity } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ShieldCheck, Users, AlertOctagon, Activity, Info, FlaskConical } from 'lucide-react'
 
 interface StatCardProps {
   title: string
@@ -10,7 +10,23 @@ interface StatCardProps {
   suffix?: string
   subtext: string
   iconType: 'shield' | 'users' | 'alert' | 'activity'
-  colorClass?: string
+  tooltipText?: string
+  isDemo?: boolean
+  accentColor?: string
+}
+
+const iconMap = {
+  shield: ShieldCheck,
+  users: Users,
+  alert: AlertOctagon,
+  activity: Activity,
+}
+
+const colorMap = {
+  shield: { accent: 'var(--db-accent)', bg: 'var(--db-accent-light)', border: 'var(--db-border-strong)' },
+  users:  { accent: '#8B5CF6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)' },
+  alert:  { accent: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)' },
+  activity: { accent: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
 }
 
 export default function StatCard({
@@ -19,89 +35,132 @@ export default function StatCard({
   suffix = '',
   subtext,
   iconType,
-  colorClass = 'text-cyan-400 border-cyan-500/20'
+  tooltipText,
+  isDemo = false,
 }: StatCardProps) {
   const [count, setCount] = useState(0)
+  const [showTooltip, setShowTooltip] = useState(false)
+  const Icon = iconMap[iconType]
+  const colors = colorMap[iconType]
 
-  // Map icon strings to Lucide components
-  const renderIcon = () => {
-    const className = "h-4.5 w-4.5 text-cyan-400"
-    switch (iconType) {
-      case 'shield':
-        return <ShieldCheck className={className} />
-      case 'users':
-        return <Users className={className} />
-      case 'alert':
-        return <AlertOctagon className={className} />
-      case 'activity':
-        return <Activity className={className} />
-      default:
-        return <ShieldCheck className={className} />
-    }
-  }
-
-  // Smooth integer counter animation
+  // Smooth counter animation
   useEffect(() => {
+    if (value === 0) { setCount(0); return }
     let start = 0
-    const end = value
-    if (end === 0) {
-      setCount(0)
-      return
-    }
-
-    const duration = 1.2 // 1.2 seconds animation
-    const incrementTime = Math.max(Math.floor((duration * 1000) / end), 15)
-    
+    const increment = Math.ceil(value / 60)
     const timer = setInterval(() => {
-      start += Math.ceil(end / 80)
-      if (start >= end) {
-        clearInterval(timer)
-        setCount(end)
-      } else {
-        setCount(start)
-      }
-    }, incrementTime)
-
+      start += increment
+      if (start >= value) { clearInterval(timer); setCount(value) }
+      else setCount(start)
+    }, 20)
     return () => clearInterval(timer)
   }, [value])
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 15 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -4, scale: 1.01 }}
+      whileHover={{ y: -3, transition: { duration: 0.2 } }}
       transition={{ duration: 0.4 }}
-      className={`relative overflow-hidden rounded-2xl border bg-slate-900/60 p-6 backdrop-blur-xl transition-all shadow-[0_0_15px_rgba(0,0,0,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.15)] ${colorClass}`}
+      className="relative overflow-hidden rounded-2xl p-5"
+      style={{
+        background: 'rgba(255,255,255,0.90)',
+        border: '1px solid var(--db-border)',
+        boxShadow: 'var(--db-shadow-md)',
+        backdropFilter: 'blur(12px)',
+      }}
     >
-      {/* Background glow orb */}
-      <div 
-        aria-hidden="true" 
-        className="absolute -right-6 -bottom-6 w-24 h-24 rounded-full blur-3xl opacity-10 bg-cyan-400"
+      {/* Subtle accent tint corner */}
+      <div
+        className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl"
+        style={{ background: colors.bg, opacity: 0.6 }}
       />
 
-      <div className="flex items-center justify-between gap-4 mb-3">
-        <span className="font-mono text-xs font-semibold tracking-wider text-slate-400 uppercase">
-          {title}
-        </span>
-        <div className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/40">
-          {renderIcon()}
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-3 mb-4 relative">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: 'var(--db-text-secondary)' }}>
+            {title}
+          </span>
+
+          {/* Info tooltip trigger */}
+          {tooltipText && (
+            <div className="relative">
+              <button
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+                onFocus={() => setShowTooltip(true)}
+                onBlur={() => setShowTooltip(false)}
+                className="cursor-pointer"
+                style={{ color: 'var(--db-text-muted)' }}
+                aria-label={`Info about ${title}`}
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+
+              <AnimatePresence>
+                {showTooltip && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 top-6 z-50 w-56 p-3 rounded-xl text-xs leading-relaxed pointer-events-none"
+                    style={{
+                      background: 'rgba(255,255,255,0.97)',
+                      border: '1px solid var(--db-border-strong)',
+                      boxShadow: 'var(--db-shadow-lg)',
+                      color: 'var(--db-text-secondary)',
+                      backdropFilter: 'blur(12px)',
+                    }}
+                  >
+                    {tooltipText}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {/* Icon */}
+        <div
+          className="p-2.5 rounded-xl shrink-0"
+          style={{ background: colors.bg, border: `1px solid ${colors.border}` }}
+        >
+          <Icon className="h-4 w-4" style={{ color: colors.accent }} />
         </div>
       </div>
 
-      <div className="flex items-baseline gap-1 mb-1.5">
-        <span className="text-3xl font-bold font-mono tracking-tight text-white">
+      {/* Value */}
+      <div className="flex items-baseline gap-1 mb-1 relative">
+        <span className="text-3xl font-bold font-mono tracking-tight" style={{ color: 'var(--db-text-primary)' }}>
           {count.toLocaleString()}
         </span>
         {suffix && (
-          <span className="text-lg font-mono font-bold text-cyan-400">
+          <span className="text-lg font-bold font-mono" style={{ color: colors.accent }}>
             {suffix}
           </span>
         )}
       </div>
 
-      <p className="text-xs font-mono text-slate-500">
-        {subtext}
-      </p>
+      {/* Subtext */}
+      <p className="text-xs relative" style={{ color: 'var(--db-text-muted)' }}>{subtext}</p>
+
+      {/* Demo data badge */}
+      {isDemo && (
+        <div
+          className="absolute top-3 right-3 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold uppercase tracking-wider"
+          style={{
+            background: 'rgba(245,158,11,0.10)',
+            border: '1px solid rgba(245,158,11,0.25)',
+            color: '#D97706',
+          }}
+          title="This metric is using demonstration data"
+        >
+          <FlaskConical className="h-2.5 w-2.5" />
+          Demo
+        </div>
+      )}
     </motion.div>
   )
 }
