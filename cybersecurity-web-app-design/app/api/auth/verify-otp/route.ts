@@ -39,10 +39,18 @@ export async function POST(request: NextRequest) {
 
     const { otp } = parsed.data
 
-    // Read registration context from cookie
-    const cookieHeader = request.headers.get('cookie') ?? ''
-    const cookies = parse(cookieHeader)
-    const rawIntent = cookies['registration_intent']
+    // Read registration context from cookie — try both cookie header and cookies() API
+    let rawIntent = ""
+    
+    try {
+      const cookieStore = await cookies()
+      rawIntent = cookieStore.get('registration_intent')?.value ?? ""
+    } catch {
+      // Fallback to header parsing if cookies() fails
+      const cookieHeader = request.headers.get('cookie') ?? ''
+      const parsedCookies = parse(cookieHeader)
+      rawIntent = parsedCookies['registration_intent'] ?? ""
+    }
 
     if (!rawIntent) {
       return NextResponse.json(
@@ -232,7 +240,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { success: true, message: 'Account verified and created successfully.' },
-      { status: 201 }
+      { 
+        status: 201,
+        headers: {
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      }
     )
   } catch (error) {
     console.error('[verify-otp] Unexpected error:', error)

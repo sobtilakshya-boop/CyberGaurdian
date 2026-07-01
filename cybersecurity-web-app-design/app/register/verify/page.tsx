@@ -109,6 +109,7 @@ export default function VerifyPage() {
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ otp: code }),
       })
       const data = await res.json()
@@ -165,6 +166,7 @@ export default function VerifyPage() {
       const res = await fetch("/api/auth/register-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ name, email, phone, password, confirmPassword }),
       })
       const data = await res.json()
