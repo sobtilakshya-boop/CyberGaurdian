@@ -15,6 +15,8 @@ interface FieldErrors {
   name?: string[]
   email?: string[]
   phone?: string[]
+  password?: string[]
+  confirmPassword?: string[]
   _form?: string
 }
 
@@ -33,6 +35,8 @@ export function AuthPage({ initialMode, onBack }: AuthPageProps) {
     const name = (formData.get("name") as string ?? "").trim()
     const email = (formData.get("gmail") as string ?? "").trim()
     const phone = (formData.get("phone") as string ?? "").trim()
+    const password = (formData.get("password") as string ?? "").trim()
+    const confirmPassword = (formData.get("confirmPassword") as string ?? "").trim()
 
     if (mode === "login") {
       // Login is a future feature — stub for now
@@ -46,7 +50,7 @@ export function AuthPage({ initialMode, onBack }: AuthPageProps) {
       const res = await fetch("/api/auth/register-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone }),
+        body: JSON.stringify({ name, email, phone, password, confirmPassword }),
       })
 
       const data = await res.json()
@@ -56,6 +60,8 @@ export function AuthPage({ initialMode, onBack }: AuthPageProps) {
         sessionStorage.setItem("cg_pending_phone", phone)
         sessionStorage.setItem("cg_pending_name", name)
         sessionStorage.setItem("cg_pending_email", email)
+        sessionStorage.setItem("cg_pending_password", password)
+        sessionStorage.setItem("cg_pending_confirmPassword", confirmPassword)
         router.push("/register/verify")
       } else if (data.details) {
         // Zod field-level validation errors from the API
@@ -137,6 +143,24 @@ export function AuthPage({ initialMode, onBack }: AuthPageProps) {
               icon={<Phone className="h-4 w-4" aria-hidden="true" />}
               autoComplete="tel"
               error={errors.phone?.[0]}
+            />
+            <Field
+              id="password"
+              label="Password"
+              type="password"
+              placeholder="Min 8 chars, 1 uppercase, 1 number, 1 symbol"
+              icon={<Shield className="h-4 w-4" aria-hidden="true" />}
+              autoComplete="new-password"
+              error={errors.password?.[0]}
+            />
+            <Field
+              id="confirmPassword"
+              label="Confirm Password"
+              type="password"
+              placeholder="Re-enter your password"
+              icon={<Shield className="h-4 w-4" aria-hidden="true" />}
+              autoComplete="new-password"
+              error={errors.confirmPassword?.[0]}
             />
 
             <Button

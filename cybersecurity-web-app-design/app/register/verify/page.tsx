@@ -119,6 +119,8 @@ export default function VerifyPage() {
         sessionStorage.removeItem("cg_pending_phone")
         sessionStorage.removeItem("cg_pending_name")
         sessionStorage.removeItem("cg_pending_email")
+        sessionStorage.removeItem("cg_pending_password")
+        sessionStorage.removeItem("cg_pending_confirmPassword")
         setTimeout(() => router.push("/dashboard"), 2000)
       } else {
         setStatus("error")
@@ -146,6 +148,8 @@ export default function VerifyPage() {
     const phone = sessionStorage.getItem("cg_pending_phone") ?? ""
     const name = sessionStorage.getItem("cg_pending_name") ?? ""
     const email = sessionStorage.getItem("cg_pending_email") ?? ""
+    const password = sessionStorage.getItem("cg_pending_password") ?? ""
+    const confirmPassword = sessionStorage.getItem("cg_pending_confirmPassword") ?? ""
 
     if (!phone) {
       setStatus("error")
@@ -161,7 +165,7 @@ export default function VerifyPage() {
       const res = await fetch("/api/auth/register-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, phone }),
+        body: JSON.stringify({ name, email, phone, password, confirmPassword }),
       })
       const data = await res.json()
 
