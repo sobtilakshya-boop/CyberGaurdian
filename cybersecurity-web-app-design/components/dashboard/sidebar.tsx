@@ -6,13 +6,17 @@ import { motion } from 'framer-motion'
 import {
   Home,
   BookOpen,
-  ClipboardCheck,
-  FolderOpen,
-  BarChart3,
-  Settings,
-  User,
-  LogOut,
   Shield,
+  Video,
+  Book,
+  Gamepad,
+  Puzzle,
+  Newspaper,
+  Trophy,
+  Award,
+  User,
+  Settings,
+  LogOut,
   Loader
 } from 'lucide-react'
 import { useState } from 'react'
@@ -35,12 +39,17 @@ export default function Sidebar({ user }: SidebarProps) {
 
   const navItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
-    { name: 'Learn', href: '/dashboard/learn', icon: BookOpen },
-    { name: 'Assessments', href: '/dashboard/assessments', icon: ClipboardCheck },
-    { name: 'Resources', href: '/dashboard/resources', icon: FolderOpen },
-    { name: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+    { name: 'My Learning', href: '/dashboard/learn', icon: BookOpen },
+    { name: 'Cyber Hygiene', href: '/dashboard/learn', icon: Shield },
+    { name: 'Videos', href: '/dashboard/learn/1/video', icon: Video },
+    { name: 'Comics', href: '/dashboard/learn/1/comic', icon: Book },
+    { name: 'Activities', href: '/dashboard/learn/1/activities', icon: Gamepad },
+    { name: 'Puzzles', href: '/dashboard/learn/1/puzzles', icon: Puzzle },
+    { name: 'News & Awareness', href: '/dashboard', icon: Newspaper }, // points to dashboard overview news feed
+    { name: 'Achievements', href: '/dashboard', icon: Trophy },       // points to dashboard achievements
+    { name: 'Certificates', href: '/dashboard', icon: Award },
     { name: 'Profile', href: '/dashboard/profile', icon: User },
+    { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]
 
   async function handleLogout() {

@@ -19,6 +19,8 @@ import {
   Loader
 } from 'lucide-react'
 
+import XpBadge from '@/components/dashboard/xp-badge'
+
 interface UserSession {
   userId: string
   name: string
@@ -101,6 +103,9 @@ export default function Topbar({ user }: TopbarProps) {
 
         {/* Action Controls */}
         <div className="flex items-center gap-4">
+          {/* Gamified XP Indicator */}
+          <XpBadge />
+
           {/* Notification Alert (Subtle) */}
           <button
             className="relative p-2 rounded-xl border border-slate-800 bg-slate-900/30 text-slate-400 hover:text-cyan-400 transition-all cursor-pointer hover:shadow-[0_0_8px_rgba(6,182,212,0.1)]"
