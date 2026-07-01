@@ -34,10 +34,12 @@ interface RegistrationIntent {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('[verify-otp] Received body:', body)
 
     // Validate OTP payload
     const parsed = VerifyOtpSchema.safeParse(body)
     if (!parsed.success) {
+      console.log('[verify-otp] OTP validation failed:', parsed.error.flatten().fieldErrors)
       return NextResponse.json(
         { success: false, error: 'Invalid OTP format', details: parsed.error.flatten().fieldErrors },
         { status: 400 }
@@ -45,6 +47,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { otp, sessionData } = parsed.data
+    console.log('[verify-otp] OTP passed validation:', otp)
 
     // Try to read registration context from cookie first
     let intent: RegistrationIntent | null = null
