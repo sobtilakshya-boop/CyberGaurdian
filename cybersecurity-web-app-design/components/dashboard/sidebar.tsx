@@ -35,6 +35,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
   const navItems = [
     { name: 'Home', href: '/dashboard', icon: Home },
+    { name: 'Courses', href: '/dashboard/courses', icon: BookOpen },
     { name: 'Learn', href: '/dashboard/learn', icon: BookOpen },
     { name: 'Assessments', href: '/dashboard/assessments', icon: ClipboardCheck },
     { name: 'Resources', href: '/dashboard/resources', icon: FolderOpen },
