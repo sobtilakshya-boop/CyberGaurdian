@@ -33,18 +33,27 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<FieldErrors>({})
   
-  // Mouse tracking for interactive 3D card tilt & parallax
+  // Mouse tracking for interactive 3D card tilt & parallax (using refs to avoid React re-renders)
   const cardRef = useRef<HTMLDivElement>(null)
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-  const [rotateX, setRotateX] = useState(0)
-  const [rotateY, setRotateY] = useState(0)
+  const orb1Ref = useRef<HTMLDivElement>(null)
+  const orb2Ref = useRef<HTMLDivElement>(null)
+  const mouseRef = useRef({ x: 0, y: 0 })
 
   // Canvas particle network background
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const handleMouseMoveGlobal = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY })
+      const mx = e.clientX
+      const my = e.clientY
+      mouseRef.current = { x: mx, y: my }
+
+      if (orb1Ref.current) {
+        orb1Ref.current.style.transform = `translate3d(${mx * 0.03}px, ${my * 0.03}px, 0)`
+      }
+      if (orb2Ref.current) {
+        orb2Ref.current.style.transform = `translate3d(${-mx * 0.02}px, ${-my * 0.02}px, 0)`
+      }
 
       if (cardRef.current) {
         const rect = cardRef.current.getBoundingClientRect()
@@ -57,9 +66,10 @@ export default function LoginPage() {
         const tiltX = (e.clientY - centerY) / (window.innerHeight / 2)
         const tiltY = (e.clientX - centerX) / (window.innerWidth / 2)
 
-        // Set rotation angles (max 10 degrees tilt)
-        setRotateX(-tiltX * 10)
-        setRotateY(tiltY * 10)
+        // Set rotation angles directly on style (max 10 degrees tilt)
+        const rx = -tiltX * 10
+        const ry = tiltY * 10
+        cardRef.current.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg)`
       }
     }
 
@@ -132,8 +142,8 @@ export default function LoginPage() {
         ctx.fill()
 
         // Interaction with mouse (attract slightly)
-        const dxMouse = mousePos.x - p1.x
-        const dyMouse = mousePos.y - p1.y
+        const dxMouse = mouseRef.current.x - p1.x
+        const dyMouse = mouseRef.current.y - p1.y
         const distMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse)
         if (distMouse < 180) {
           p1.x += dxMouse * 0.005
@@ -167,7 +177,7 @@ export default function LoginPage() {
       window.removeEventListener("resize", handleResize)
       cancelAnimationFrame(animationId)
     }
-  }, [mousePos])
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -236,21 +246,25 @@ export default function LoginPage() {
 
       {/* Floating Ambient Glowing Orbs */}
       <div 
+        ref={orb1Ref}
         className="absolute w-[450px] h-[450px] rounded-full blur-[140px] opacity-[0.08] pointer-events-none z-0 transition-transform duration-500 ease-out"
         style={{ 
           background: "radial-gradient(circle, rgba(6,182,212,0.8) 0%, transparent 70%)",
           left: "20%",
           top: "10%",
-          transform: `translate(${mousePos.x * 0.03}px, ${mousePos.y * 0.03}px)`
+          transform: "translate3d(0px, 0px, 0)",
+          willChange: "transform"
         }}
       />
       <div 
+        ref={orb2Ref}
         className="absolute w-[500px] h-[500px] rounded-full blur-[150px] opacity-[0.05] pointer-events-none z-0 transition-transform duration-500 ease-out"
         style={{ 
           background: "radial-gradient(circle, rgba(147,51,234,0.6) 0%, transparent 70%)",
           right: "15%",
           bottom: "15%",
-          transform: `translate(${-mousePos.x * 0.02}px, ${-mousePos.y * 0.02}px)`
+          transform: "translate3d(0px, 0px, 0)",
+          willChange: "transform"
         }}
       />
 
@@ -277,8 +291,9 @@ export default function LoginPage() {
           className="w-full relative rounded-2xl p-[1px] transition-all duration-300"
           style={{
             background: "linear-gradient(135deg, rgba(6,182,212,0.45) 0%, rgba(6,182,212,0.08) 50%, rgba(6,182,212,0.3) 100%)",
-            transform: `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-            transformStyle: "preserve-3d"
+            transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)",
+            transformStyle: "preserve-3d",
+            willChange: "transform"
           }}
         >
           {/* Glassmorphic Background Panel */}

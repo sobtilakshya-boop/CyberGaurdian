@@ -7,7 +7,8 @@ import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Menu, X, Bell, User, LogOut, Loader, Search, Shield,
-  Home, BookOpen, GraduationCap, Settings, ChevronRight
+  Home, BookOpen, GraduationCap, Settings, ChevronRight,
+  Newspaper, Award, Trophy
 } from 'lucide-react'
 import XpBadge from '@/components/dashboard/xp-badge'
 
@@ -20,6 +21,10 @@ interface TopbarProps { user: UserSession }
 const breadcrumbMap: Record<string, string[]> = {
   '/dashboard': ['Dashboard'],
   '/dashboard/course': ['Dashboard', 'My Learning'],
+  '/dashboard/hygiene': ['Dashboard', 'Cyber Hygiene'],
+  '/dashboard/news': ['Dashboard', 'News & Awareness'],
+  '/dashboard/achievements': ['Dashboard', 'Achievements'],
+  '/dashboard/certificates': ['Dashboard', 'Certificates'],
   '/dashboard/profile': ['Dashboard', 'Profile'],
   '/dashboard/settings': ['Dashboard', 'Settings'],
 }
@@ -52,6 +57,10 @@ export default function Topbar({ user }: TopbarProps) {
   const mobileNavItems = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
     { name: 'My Learning', href: '/dashboard/course', icon: GraduationCap },
+    { name: 'Cyber Hygiene', href: '/dashboard/hygiene', icon: Shield },
+    { name: 'News & Awareness', href: '/dashboard/news', icon: Newspaper },
+    { name: 'Achievements', href: '/dashboard/achievements', icon: Trophy },
+    { name: 'Certificates', href: '/dashboard/certificates', icon: Award },
     { name: 'Profile', href: '/dashboard/profile', icon: User },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ]

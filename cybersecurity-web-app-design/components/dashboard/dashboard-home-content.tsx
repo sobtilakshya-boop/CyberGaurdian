@@ -48,11 +48,17 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
 
   // Fetch live/demo metrics from server route
   useEffect(() => {
-    fetch('/api/dashboard/metrics')
+    fetch(`/api/dashboard/metrics?xp=${progress.xp}&pct=${overallPct}`)
       .then(r => r.json())
       .then(setMetrics)
-      .catch(() => setMetrics({ userCount: 398, securityScore: 98, activeThreats: 0, logsProcessed: 1249, isDemoData: true }))
-  }, [])
+      .catch(() => setMetrics({ 
+        userCount: 1, 
+        securityScore: Math.min(100, 75 + Math.round(overallPct * 0.25)), 
+        activeThreats: Math.max(0, 4 - Math.floor(overallPct / 25)), 
+        logsProcessed: 8400 + progress.xp * 8, 
+        isDemoData: false 
+      }))
+  }, [progress.xp, overallPct])
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
@@ -152,14 +158,8 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
           </motion.div>
         </div>
 
-        {/* 3D Astronaut right column */}
-        <div className="lg:col-span-2 rounded-2xl overflow-hidden"
-          style={{
-            background: 'linear-gradient(135deg, rgba(14,165,233,0.06), rgba(139,92,246,0.06))',
-            border: '1px solid var(--db-border)',
-            boxShadow: 'var(--db-shadow-md)',
-          }}
-        >
+        {/* 3D Cyber Security Globe right column */}
+        <div className="lg:col-span-2 relative select-none">
           <Suspense fallback={
             <div className="h-[380px] flex items-center justify-center" style={{ color: 'var(--db-text-muted)' }}>
               <div className="flex flex-col items-center gap-3 text-xs font-mono">

@@ -44,15 +44,15 @@ const navGroups = [
     label: 'Learning',
     items: [
       { name: 'My Learning', href: '/dashboard/course', icon: GraduationCap },
-      { name: 'Cyber Hygiene', href: '/dashboard/course', icon: Shield },
-      { name: 'News & Awareness', href: '/dashboard', icon: Newspaper },
+      { name: 'Cyber Hygiene', href: '/dashboard/hygiene', icon: Shield },
+      { name: 'News & Awareness', href: '/dashboard/news', icon: Newspaper },
     ],
   },
   {
     label: 'Progress',
     items: [
-      { name: 'Achievements', href: '/dashboard', icon: Trophy },
-      { name: 'Certificates', href: '/dashboard', icon: Award },
+      { name: 'Achievements', href: '/dashboard/achievements', icon: Trophy },
+      { name: 'Certificates', href: '/dashboard/certificates', icon: Award },
     ],
   },
   {

@@ -345,15 +345,25 @@ export function LandingPage({ onAuth }: LandingPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const heroCardRef = useRef<HTMLDivElement>(null)
   const aboutCardRef = useRef<HTMLDivElement>(null)
+  const orb1Ref = useRef<HTMLDivElement>(null)
+  const orb2Ref = useRef<HTMLDivElement>(null)
+  const orb3Ref = useRef<HTMLDivElement>(null)
 
-  const [heroTilt, setHeroTilt] = useState({ rotateX: 0, rotateY: 0 })
-  const [aboutTilt, setAboutTilt] = useState({ rotateX: 0, rotateY: 0 })
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
-
-  // Mouse handler — only for card tilt and bokeh parallax (NOT particles)
+  // Mouse handler — only for card tilt and bokeh parallax (NOT particles) (using refs to avoid React re-renders)
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      setMousePos({ x: e.clientX, y: e.clientY })
+      const mx = e.clientX
+      const my = e.clientY
+
+      if (orb1Ref.current) {
+        orb1Ref.current.style.transform = `translate3d(${mx * 0.014}px, ${my * 0.01}px, 0)`
+      }
+      if (orb2Ref.current) {
+        orb2Ref.current.style.transform = `translate3d(${-mx * 0.009}px, ${my * 0.007}px, 0)`
+      }
+      if (orb3Ref.current) {
+        orb3Ref.current.style.transform = `translate3d(${mx * 0.006}px, ${-my * 0.007}px, 0)`
+      }
 
       if (heroCardRef.current) {
         const rect = heroCardRef.current.getBoundingClientRect()
@@ -361,7 +371,9 @@ export function LandingPage({ onAuth }: LandingPageProps) {
         const centerY = rect.top + rect.height / 2
         const tiltX = (e.clientY - centerY) / (window.innerHeight / 2)
         const tiltY = (e.clientX - centerX) / (window.innerWidth / 2)
-        setHeroTilt({ rotateX: -tiltX * 12, rotateY: tiltY * 12 })
+        const rx = -tiltX * 12
+        const ry = tiltY * 12
+        heroCardRef.current.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg)`
       }
       if (aboutCardRef.current) {
         const rect = aboutCardRef.current.getBoundingClientRect()
@@ -369,7 +381,9 @@ export function LandingPage({ onAuth }: LandingPageProps) {
         const centerY = rect.top + rect.height / 2
         const tiltX = (e.clientY - centerY) / (window.innerHeight / 2)
         const tiltY = (e.clientX - centerX) / (window.innerWidth / 2)
-        setAboutTilt({ rotateX: -tiltX * 8, rotateY: tiltY * 8 })
+        const rx = -tiltX * 8
+        const ry = tiltY * 8
+        aboutCardRef.current.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg)`
       }
     }
     window.addEventListener("mousemove", handleMouseMove)
@@ -587,36 +601,48 @@ export function LandingPage({ onAuth }: LandingPageProps) {
 
         {/* ── BG 3: Bokeh orbs (mouse-parallax only on these) ───────────────── */}
         {/* Primary — top-center cyan */}
-        <div aria-hidden="true" className="absolute pointer-events-none z-[4]"
+        <div 
+          ref={orb1Ref}
+          aria-hidden="true" 
+          className="absolute pointer-events-none z-[4]"
           style={{
             width: "780px", height: "680px", borderRadius: "50%",
             background: "radial-gradient(circle, rgba(6,182,212,0.5) 0%, rgba(6,182,212,0.07) 45%, transparent 70%)",
             filter: "blur(130px)", opacity: 0.11,
             top: "-15%", left: "18%",
-            transform: `translate(${mousePos.x * 0.014}px, ${mousePos.y * 0.01}px)`,
+            transform: "translate3d(0px, 0px, 0)",
             transition: "transform 1.2s ease-out",
+            willChange: "transform",
           }}
         />
         {/* Secondary — right azure */}
-        <div aria-hidden="true" className="absolute pointer-events-none z-[4]"
+        <div 
+          ref={orb2Ref}
+          aria-hidden="true" 
+          className="absolute pointer-events-none z-[4]"
           style={{
             width: "600px", height: "600px", borderRadius: "50%",
             background: "radial-gradient(circle, rgba(56,189,248,0.6) 0%, rgba(59,130,246,0.1) 40%, transparent 70%)",
             filter: "blur(145px)", opacity: 0.09,
             top: "8%", right: "-6%",
-            transform: `translate(${-mousePos.x * 0.009}px, ${mousePos.y * 0.007}px)`,
+            transform: "translate3d(0px, 0px, 0)",
             transition: "transform 1.4s ease-out",
+            willChange: "transform",
           }}
         />
         {/* Tertiary — bottom-left cobalt */}
-        <div aria-hidden="true" className="absolute pointer-events-none z-[4]"
+        <div 
+          ref={orb3Ref}
+          aria-hidden="true" 
+          className="absolute pointer-events-none z-[4]"
           style={{
             width: "680px", height: "580px", borderRadius: "50%",
             background: "radial-gradient(circle, rgba(30,64,175,0.65) 0%, rgba(59,130,246,0.07) 45%, transparent 70%)",
             filter: "blur(165px)", opacity: 0.10,
             bottom: "3%", left: "-9%",
-            transform: `translate(${mousePos.x * 0.006}px, ${-mousePos.y * 0.007}px)`,
+            transform: "translate3d(0px, 0px, 0)",
             transition: "transform 1.6s ease-out",
+            willChange: "transform",
           }}
         />
         {/* Micro near-field pair */}
@@ -681,7 +707,7 @@ export function LandingPage({ onAuth }: LandingPageProps) {
 
             {/* 3D tilt shield */}
             <motion.div variants={itemVariants} ref={heroCardRef}
-              style={{ transform: `perspective(1000px) rotateX(${heroTilt.rotateX}deg) rotateY(${heroTilt.rotateY}deg)`, transformStyle: "preserve-3d" }}
+              style={{ transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)", transformStyle: "preserve-3d", willChange: "transform" }}
               className="relative mb-10 flex h-36 w-36 items-center justify-center transition-transform duration-300 ease-out cursor-pointer group"
             >
               <div className="absolute inset-0 rounded-full bg-cyan-500/10 blur-2xl opacity-60 group-hover:opacity-85 transition-opacity duration-300" />
@@ -741,9 +767,10 @@ export function LandingPage({ onAuth }: LandingPageProps) {
             transition={{ type: "spring", stiffness: 70, damping: 15 }}
             className="mx-auto max-w-3xl relative rounded-2xl p-[1px] shadow-[0_0_50px_rgba(6,182,212,0.05)] hover:shadow-[0_0_60px_rgba(6,182,212,0.12)] transition-all duration-300 ease-out"
             style={{
-              transform: `perspective(1000px) rotateX(${aboutTilt.rotateX}deg) rotateY(${aboutTilt.rotateY}deg)`,
+              transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)",
               transformStyle: "preserve-3d",
-              background: "linear-gradient(135deg, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0.05) 50%, rgba(6,182,212,0.2) 100%)"
+              background: "linear-gradient(135deg, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0.05) 50%, rgba(6,182,212,0.2) 100%)",
+              willChange: "transform"
             }}
           >
             <div className="rounded-2xl bg-slate-950/80 backdrop-blur-3xl p-8 sm:p-12 border border-slate-900/80 flex flex-col items-center text-center gap-6" style={{ transform: "translateZ(25px)" }}>

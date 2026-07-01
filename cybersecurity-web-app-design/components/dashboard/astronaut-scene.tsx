@@ -1,200 +1,407 @@
 "use client"
 
-import { useRef, useState, Suspense } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useTexture, Float, OrbitControls, Environment } from '@react-three/drei'
+import { useRef, Suspense, useMemo, useState, useEffect } from 'react'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { OrbitControls, useTexture } from '@react-three/drei'
 import * as THREE from 'three'
 
-// ─── Astronaut body built from primitives ────────────────────────────────────
-function AstronautBody({ isHovered }: { isHovered: boolean }) {
-  const groupRef = useRef<THREE.Group>(null!)
-  const flagRef = useRef<THREE.Group>(null!)
+const GLOBE_RADIUS = 0.76
 
-  useFrame((state) => {
-    if (!isHovered) {
-      // Idle: gentle bobbing
-      groupRef.current.position.y = Math.sin(state.clock.elapsedTime * 0.8) * 0.05
-      groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.3) * 0.1
+// Global threat intelligence station nodes
+const CITIES = [
+  { name: 'New York', lat: 40.7128, lon: -74.0060, color: '#ef4444' },
+  { name: 'London', lat: 51.5074, lon: -0.1278, color: '#3b82f6' },
+  { name: 'Tokyo', lat: 35.6762, lon: 139.6503, color: '#a855f7' },
+  { name: 'Sydney', lat: -33.8688, lon: 151.2093, color: '#10b981' },
+  { name: 'Bangalore', lat: 12.9716, lon: 77.5946, color: '#f59e0b' }
+]
+
+// Convert Lat/Lon to spherical Vector3 coordinates
+function getSphericalCoords(lat: number, lon: number, r: number) {
+  const theta = (lon * Math.PI) / 180
+  const phi = ((90 - lat) * Math.PI) / 180
+  
+  const x = r * Math.sin(phi) * Math.cos(theta)
+  const y = r * Math.cos(phi)
+  const z = r * Math.sin(phi) * Math.sin(theta)
+  return new THREE.Vector3(x, y, z)
+}
+
+// ─── Glowing Plasma Comet Threat Trail ─────────────────────────────────────────
+function ActiveAttack({ 
+  fromNode, 
+  toNode, 
+  onComplete
+}: { 
+  fromNode: THREE.Vector3
+  toNode: THREE.Vector3
+  onComplete: () => void
+}) {
+  const headRef = useRef<THREE.Mesh>(null!)
+  const tail1Ref = useRef<THREE.Mesh>(null!)
+  const tail2Ref = useRef<THREE.Mesh>(null!)
+  const tail3Ref = useRef<THREE.Mesh>(null!)
+  const ringRef = useRef<THREE.Mesh>(null!)
+  
+  const [stage, setStage] = useState<'flying' | 'impact' | 'done'>('flying')
+  const progressRef = useRef(0)
+  const [opacity, setOpacity] = useState(1.0)
+  const [ringScale, setRingScale] = useState(1.0)
+
+  // Bezier curve path arching outwards
+  const { curve, floatArray } = useMemo(() => {
+    const midPoint = new THREE.Vector3()
+      .addVectors(fromNode, toNode)
+      .multiplyScalar(0.5)
+      .normalize()
+      .multiplyScalar(GLOBE_RADIUS * 1.36) // Bezier height arch
+      
+    const c = new THREE.QuadraticBezierCurve3(fromNode, midPoint, toNode)
+    const points = c.getPoints(24)
+    const posArr = new Float32Array(points.flatMap(p => [p.x, p.y, p.z]))
+    return { curve: c, floatArray: posArr }
+  }, [fromNode, toNode])
+
+  // Normal vector pointing straight out from the sphere at the landing node
+  const normal = useMemo(() => toNode.clone().normalize(), [toNode])
+  
+  // Align flat ring flat on sphere surface using quaternions
+  const ringQuaternion = useMemo(() => {
+    const q = new THREE.Quaternion()
+    q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
+    return q
+  }, [normal])
+
+  useFrame((state, delta) => {
+    if (stage === 'flying') {
+      progressRef.current += delta * 0.95 // speed of flight
+      if (progressRef.current >= 1.0) {
+        progressRef.current = 1.0
+        setStage('impact')
+        progressRef.current = 0 // reuse for shockwave timer
+      } else {
+        const t = progressRef.current
+        
+        // Position Head
+        const pHead = curve.getPointAt(t)
+        if (headRef.current) headRef.current.position.copy(pHead)
+        
+        // Position Tail 1 (slight delay)
+        const pTail1 = curve.getPointAt(Math.max(0, t - 0.035))
+        if (tail1Ref.current) tail1Ref.current.position.copy(pTail1)
+        
+        // Position Tail 2 (moderate delay)
+        const pTail2 = curve.getPointAt(Math.max(0, t - 0.07))
+        if (tail2Ref.current) tail2Ref.current.position.copy(pTail2)
+
+        // Position Tail 3 (long delay)
+        const pTail3 = curve.getPointAt(Math.max(0, t - 0.105))
+        if (tail3Ref.current) tail3Ref.current.position.copy(pTail3)
+      }
+    } else if (stage === 'impact') {
+      progressRef.current += delta * 1.6 // speed of ring expansion
+      if (progressRef.current >= 1.0) {
+        setStage('done')
+        onComplete()
+      } else {
+        setRingScale(1 + progressRef.current * 4.5)
+        setOpacity(Math.max(0, 1 - progressRef.current))
+      }
     }
   })
 
-  // Body material – white spacesuit
-  const suitMat = new THREE.MeshStandardMaterial({ color: '#E8EEF8', roughness: 0.4, metalness: 0.1 })
-  const helmetMat = new THREE.MeshStandardMaterial({ color: '#B8D4F0', roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.85 })
-  const visorMat = new THREE.MeshStandardMaterial({ color: '#60A5FA', roughness: 0.05, metalness: 0.8, transparent: true, opacity: 0.6 })
-  const detailMat = new THREE.MeshStandardMaterial({ color: '#0EA5E9', roughness: 0.5, metalness: 0.2 })
-  const flagpoleMat = new THREE.MeshStandardMaterial({ color: '#C0C8D8', roughness: 0.3, metalness: 0.7 })
+  if (stage === 'done') return null
 
   return (
-    <group ref={groupRef}>
-      {/* Torso */}
-      <mesh position={[0, 0, 0]} castShadow material={suitMat}>
-        <capsuleGeometry args={[0.2, 0.35, 8, 16]} />
-      </mesh>
+    <group>
+      {/* Curved attack stream path line */}
+      {stage === 'flying' && (
+        <line>
+          <bufferGeometry>
+            <bufferAttribute
+              attach="attributes-position"
+              args={[floatArray, 3]}
+            />
+          </bufferGeometry>
+          <lineBasicMaterial color="#ef4444" transparent opacity={0.3} linewidth={1.5} />
+        </line>
+      )}
 
-      {/* Helmet */}
-      <mesh position={[0, 0.38, 0]} castShadow material={helmetMat}>
-        <sphereGeometry args={[0.22, 24, 24]} />
-      </mesh>
-      {/* Visor */}
-      <mesh position={[0, 0.38, 0.12]} material={visorMat}>
-        <sphereGeometry args={[0.14, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2]} />
-      </mesh>
+      {/* Flight packets: Multi-Node Glowing Plasma Comet Trail */}
+      {stage === 'flying' && (
+        <group>
+          {/* 1. Main Head (Bright Red) */}
+          <mesh ref={headRef}>
+            <sphereGeometry args={[0.024, 10, 10]} />
+            <meshBasicMaterial color="#ef4444" />
+          </mesh>
+          
+          {/* 2. Tail Node 1 (Orange, slightly smaller, slight transparency) */}
+          <mesh ref={tail1Ref}>
+            <sphereGeometry args={[0.018, 8, 8]} />
+            <meshBasicMaterial color="#f97316" transparent opacity={0.8} />
+          </mesh>
 
-      {/* Backpack */}
-      <mesh position={[0, 0, -0.22]} material={suitMat}>
-        <boxGeometry args={[0.28, 0.32, 0.12]} />
-      </mesh>
+          {/* 3. Tail Node 2 (Amber, smaller, moderate transparency) */}
+          <mesh ref={tail2Ref}>
+            <sphereGeometry args={[0.013, 8, 8]} />
+            <meshBasicMaterial color="#f59e0b" transparent opacity={0.5} />
+          </mesh>
 
-      {/* Left arm */}
-      <mesh position={[-0.3, 0.05, 0]} rotation={[0, 0, -0.4]} castShadow material={suitMat}>
-        <capsuleGeometry args={[0.07, 0.25, 6, 8]} />
-      </mesh>
-      {/* Left glove */}
-      <mesh position={[-0.42, -0.12, 0]} material={detailMat}>
-        <sphereGeometry args={[0.075, 10, 10]} />
-      </mesh>
+          {/* 4. Tail Node 3 (Yellow, smallest, high transparency) */}
+          <mesh ref={tail3Ref}>
+            <sphereGeometry args={[0.008, 6, 6]} />
+            <meshBasicMaterial color="#eab308" transparent opacity={0.25} />
+          </mesh>
+        </group>
+      )}
 
-      {/* Right arm — holds flagpole */}
-      <mesh position={[0.3, 0.05, 0]} rotation={[0, 0, 0.4]} castShadow material={suitMat}>
-        <capsuleGeometry args={[0.07, 0.25, 6, 8]} />
-      </mesh>
-      {/* Right glove */}
-      <mesh position={[0.42, -0.12, 0]} material={detailMat}>
-        <sphereGeometry args={[0.075, 10, 10]} />
-      </mesh>
-
-      {/* Left leg */}
-      <mesh position={[-0.12, -0.45, 0]} rotation={[0, 0, 0.05]} castShadow material={suitMat}>
-        <capsuleGeometry args={[0.08, 0.3, 6, 8]} />
-      </mesh>
-      {/* Right leg */}
-      <mesh position={[0.12, -0.45, 0]} rotation={[0, 0, -0.05]} castShadow material={suitMat}>
-        <capsuleGeometry args={[0.08, 0.3, 6, 8]} />
-      </mesh>
-
-      {/* Boots */}
-      <mesh position={[-0.12, -0.66, 0.04]} material={detailMat}>
-        <boxGeometry args={[0.14, 0.08, 0.2]} />
-      </mesh>
-      <mesh position={[0.12, -0.66, 0.04]} material={detailMat}>
-        <boxGeometry args={[0.14, 0.08, 0.2]} />
-      </mesh>
-
-      {/* Cyan chest detail stripe */}
-      <mesh position={[0, 0.04, 0.19]} material={detailMat}>
-        <boxGeometry args={[0.22, 0.04, 0.02]} />
-      </mesh>
-
-      {/* Flag assembly */}
-      <group ref={flagRef} position={[0.48, -0.08, 0]}>
-        {/* Flagpole */}
-        <mesh material={flagpoleMat} position={[0, 0.35, 0]}>
-          <cylinderGeometry args={[0.012, 0.012, 0.9, 8]} />
+      {/* Impact Ring / Expanding Shockwave lying flat on the sphere surface */}
+      {stage === 'impact' && (
+        <mesh position={toNode} quaternion={ringQuaternion} ref={ringRef}>
+          <ringGeometry args={[0.005, 0.05, 32]} />
+          <meshBasicMaterial color="#ef4444" transparent opacity={opacity} side={THREE.DoubleSide} />
         </mesh>
-        {/* Flag panel with CyberPeace logo */}
-        <FlagWithTexture position={[0.12, 0.68, 0]} />
-      </group>
+      )}
     </group>
   )
 }
 
-function FlagWithTexture({ position }: { position: [number, number, number] }) {
-  const texture = useTexture('/images/cyberpeace-logo.webp')
+// ─── Real-Time Attack Coordinator ────────────────────────────────────────────
+interface AttackData {
+  id: number
+  fromNode: THREE.Vector3
+  toNode: THREE.Vector3
+}
+
+function AttackManager({ cityVectors }: { cityVectors: THREE.Vector3[] }) {
+  const [attacks, setAttacks] = useState<AttackData[]>([])
+  const nextId = useRef(0)
+
+  useEffect(() => {
+    const spawnAttack = () => {
+      const fromIdx = Math.floor(Math.random() * cityVectors.length)
+      let toIdx = Math.floor(Math.random() * cityVectors.length)
+      while (toIdx === fromIdx) {
+        toIdx = Math.floor(Math.random() * cityVectors.length)
+      }
+
+      const newAttack: AttackData = {
+        id: nextId.current++,
+        fromNode: cityVectors[fromIdx],
+        toNode: cityVectors[toIdx]
+      }
+
+      setAttacks(prev => [...prev.slice(-3), newAttack])
+    }
+
+    // Spawn first attack immediately
+    spawnAttack()
+    const timer = setInterval(spawnAttack, 1800)
+    return () => clearInterval(timer)
+  }, [cityVectors])
+
   return (
-    <mesh position={position}>
-      <planeGeometry args={[0.28, 0.18]} />
-      <meshStandardMaterial map={texture} transparent side={THREE.DoubleSide} roughness={0.6} />
+    <group>
+      {attacks.map(attack => (
+        <ActiveAttack
+          key={attack.id}
+          fromNode={attack.fromNode}
+          toNode={attack.toNode}
+          onComplete={() => {
+            setAttacks(prev => prev.filter(a => a.id !== attack.id))
+          }}
+        />
+      ))}
+    </group>
+  )
+}
+
+// ─── Realistic Globe Core (HD Textures) ───────────────────────────────────────
+function GlobeCore() {
+  // Load detailed Earth textures from highly stable public CDN (Wildcard CORS-enabled unpkg.com)
+  const [earthTexture, bumpMap] = useTexture([
+    'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
+    'https://unpkg.com/three-globe/example/img/earth-topology.png'
+  ])
+
+  return (
+    <mesh>
+      <sphereGeometry args={[GLOBE_RADIUS, 40, 40]} />
+      <meshStandardMaterial
+        map={earthTexture}
+        bumpMap={bumpMap}
+        bumpScale={0.038}
+        roughness={0.4}
+        metalness={0.15}
+      />
     </mesh>
   )
 }
 
-// ─── Digital planet below the astronaut ──────────────────────────────────────
-function DigitalPlanet() {
-  const meshRef = useRef<THREE.Mesh>(null!)
+// ─── Space Telemetry Particles ───────────────────────────────────────────────
+function TelemetryCloud() {
+  const cloudRef = useRef<THREE.Points>(null!)
+
+  const [positions] = useMemo(() => {
+    const count = 160
+    const pos = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      const u = Math.random()
+      const v = Math.random()
+      const theta = u * 2.0 * Math.PI
+      const phi = Math.acos(2.0 * v - 1.0)
+      const dist = GLOBE_RADIUS * 1.15 + Math.random() * 0.9
+      pos[i * 3] = dist * Math.sin(phi) * Math.cos(theta)
+      pos[i * 3 + 1] = dist * Math.sin(phi) * Math.sin(theta)
+      pos[i * 3 + 2] = dist * Math.cos(phi)
+    }
+    return [pos]
+  }, [])
+
   useFrame((state) => {
-    meshRef.current.rotation.y = state.clock.elapsedTime * 0.15
+    cloudRef.current.rotation.y = state.clock.elapsedTime * 0.02
   })
+
   return (
-    <group position={[0, -1.2, 0]}>
-      {/* Planet */}
-      <mesh ref={meshRef} castShadow receiveShadow>
-        <sphereGeometry args={[0.55, 32, 32]} />
-        <meshStandardMaterial
-          color="#1E3A5F"
-          roughness={0.7}
-          metalness={0.2}
-          wireframe={false}
+    <points ref={cloudRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
         />
+      </bufferGeometry>
+      <pointsMaterial
+        color="#0ea5e9"
+        size={0.03}
+        transparent
+        opacity={0.4}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </points>
+  )
+}
+
+// ─── Dual Counter-Phased Scanning Lasers ─────────────────────────────────────
+function DualScanningLasers() {
+  const laser1Ref = useRef<THREE.Mesh>(null!)
+  const laser2Ref = useRef<THREE.Mesh>(null!)
+
+  useFrame((state) => {
+    const maxVal = GLOBE_RADIUS * 0.96
+    const timeVal = state.clock.elapsedTime * 1.6
+    
+    // Laser 1 moves up and down
+    laser1Ref.current.position.y = Math.sin(timeVal) * maxVal
+    
+    // Laser 2 moves in counter-phase
+    laser2Ref.current.position.y = -Math.sin(timeVal) * maxVal
+  })
+
+  return (
+    <group>
+      {/* Laser 1 Ring */}
+      <mesh ref={laser1Ref} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[GLOBE_RADIUS * 0.98, GLOBE_RADIUS * 1.01, 32]} />
+        <meshBasicMaterial color="#06b6d4" side={THREE.DoubleSide} transparent opacity={0.5} />
       </mesh>
-      {/* Wireframe grid overlay on planet */}
-      <mesh>
-        <sphereGeometry args={[0.56, 16, 16]} />
-        <meshBasicMaterial color="#0EA5E9" wireframe transparent opacity={0.12} />
-      </mesh>
-      {/* Orbital ring */}
-      <mesh rotation={[Math.PI / 2.5, 0, 0]}>
-        <torusGeometry args={[0.8, 0.015, 8, 64]} />
-        <meshStandardMaterial color="#0EA5E9" emissive="#0EA5E9" emissiveIntensity={0.4} roughness={0.3} />
+      {/* Laser 2 Ring */}
+      <mesh ref={laser2Ref} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[GLOBE_RADIUS * 0.98, GLOBE_RADIUS * 1.01, 32]} />
+        <meshBasicMaterial color="#8b5cf6" side={THREE.DoubleSide} transparent opacity={0.45} />
       </mesh>
     </group>
   )
 }
 
-// ─── Main astronaut scene ─────────────────────────────────────────────────────
-function Scene() {
-  const [isHovered, setIsHovered] = useState(false)
+// ─── Main Security Globe Setup ────────────────────────────────────────────────
+function GlobeContainer() {
+  const cityVectors = useMemo(() => {
+    return CITIES.map(c => getSphericalCoords(c.lat, c.lon, GLOBE_RADIUS))
+  }, [])
 
   return (
-    <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[5, 5, 5]} intensity={1.2} castShadow />
-      <pointLight position={[-3, 2, 3]} intensity={0.4} color="#60A5FA" />
-      <pointLight position={[3, -1, 2]} intensity={0.3} color="#8B5CF6" />
+    <group>
+      {/* Shaded Photo-Realistic Earth Core */}
+      <GlobeCore />
 
-      <Environment preset="city" />
+      {/* Grid Wireframe outer shell */}
+      <mesh>
+        <sphereGeometry args={[GLOBE_RADIUS + 0.004, 24, 24]} />
+        <meshBasicMaterial
+          color="#06b6d4"
+          wireframe
+          transparent
+          opacity={0.12}
+        />
+      </mesh>
 
-      <Float speed={1.2} rotationIntensity={0.15} floatIntensity={0.4} floatingRange={[-0.08, 0.08]}>
-        <group
-          onPointerEnter={() => setIsHovered(true)}
-          onPointerLeave={() => setIsHovered(false)}
-        >
-          <AstronautBody isHovered={isHovered} />
+      {/* Atmospheric Glow Outer Shell */}
+      <mesh>
+        <sphereGeometry args={[GLOBE_RADIUS + 0.02, 32, 32]} />
+        <meshBasicMaterial
+          color="#06b6d4"
+          transparent
+          opacity={0.08}
+          side={THREE.BackSide}
+        />
+      </mesh>
+
+      {/* City nodes */}
+      {cityVectors.map((v, i) => (
+        <group key={CITIES[i].name}>
+          {/* Inner solid node */}
+          <mesh position={v}>
+            <sphereGeometry args={[0.022, 10, 10]} />
+            <meshBasicMaterial color={CITIES[i].color} />
+          </mesh>
+          {/* Glowing node halo */}
+          <mesh position={v} scale={1.8}>
+            <sphereGeometry args={[0.022, 8, 8]} />
+            <meshBasicMaterial color={CITIES[i].color} transparent opacity={0.22} />
+          </mesh>
         </group>
-      </Float>
+      ))}
 
-      <DigitalPlanet />
-    </>
+      {/* Live threat attacks streams */}
+      <AttackManager cityVectors={cityVectors} />
+
+      {/* Telemetry points */}
+      <TelemetryCloud />
+
+      {/* Dual counter-phased scanning lasers */}
+      <DualScanningLasers />
+    </group>
   )
 }
 
-// ─── Exported canvas wrapper (Client Component boundary) ─────────────────────
 export default function AstronautScene() {
   return (
-    <div className="relative w-full" style={{ height: 380 }}>
+    <div className="relative w-full h-[380px] select-none cursor-grab active:cursor-grabbing">
       <Canvas
-        camera={{ position: [0, 0.2, 2.8], fov: 45 }}
-        shadows
+        camera={{ position: [0, 0, 2.3], fov: 45 }}
         gl={{ antialias: true, alpha: true }}
         style={{ background: 'transparent' }}
       >
+        <ambientLight intensity={1.3} />
+        {/* Main bright directional light */}
+        <directionalLight position={[5, 4, 5]} intensity={2.4} />
+        {/* Soft fill tracking light from camera side */}
+        <directionalLight position={[-5, -3, 4]} intensity={1.2} color="#06b6d4" />
+        
         <Suspense fallback={null}>
-          <Scene />
+          <GlobeContainer />
         </Suspense>
-      </Canvas>
 
-      {/* Hover label */}
-      <div
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-xs font-mono pointer-events-none"
-        style={{
-          background: 'rgba(255,255,255,0.8)',
-          border: '1px solid var(--db-border)',
-          color: 'var(--db-text-muted)',
-          backdropFilter: 'blur(8px)',
-        }}
-      >
-        Hover the astronaut to interact
-      </div>
+        {/* OrbitControls: allows drag to rotate, prevents zoom/pan, rotates automatically when idle */}
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          autoRotate={true}
+          autoRotateSpeed={0.5}
+        />
+      </Canvas>
     </div>
   )
 }

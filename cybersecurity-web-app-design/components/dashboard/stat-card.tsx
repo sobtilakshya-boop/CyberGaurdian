@@ -62,7 +62,7 @@ export default function StatCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -3, transition: { duration: 0.2 } }}
       transition={{ duration: 0.4 }}
-      className="relative overflow-hidden rounded-2xl p-5"
+      className="relative overflow-visible rounded-2xl p-5"
       style={{
         background: 'rgba(255,255,255,0.90)',
         border: '1px solid var(--db-border)',
@@ -107,7 +107,7 @@ export default function StatCard({
                     transition={{ duration: 0.15 }}
                     className="absolute left-0 top-6 z-50 w-56 p-3 rounded-xl text-xs leading-relaxed pointer-events-none"
                     style={{
-                      background: 'rgba(255,255,255,0.97)',
+                      background: 'var(--db-surface-2)',
                       border: '1px solid var(--db-border-strong)',
                       boxShadow: 'var(--db-shadow-lg)',
                       color: 'var(--db-text-secondary)',
