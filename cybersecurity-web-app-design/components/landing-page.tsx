@@ -5,124 +5,161 @@ import Image from "next/image"
 import { Shield, LockKeyhole, Radar, ScanEye, Activity, Globe, Cpu } from "lucide-react"
 import { motion } from "framer-motion"
 
-// ── Custom Cyber Targeting Cursor ────────────────────────────────────────────
+// ── Custom Cyber Targeting Cursor (zero-state, direct DOM, GPU-accelerated) ──
 function CyberCursor() {
-  const posRef = useRef({ x: -300, y: -300 })
-  const [renderPos, setRenderPos] = useState({ x: -300, y: -300 })
-  const [isHover, setIsHover] = useState(false)
-  const [isClick, setIsClick] = useState(false)
-  const [arcAngle, setArcAngle] = useState(0)
-  const arcAngleRef = useRef(0)
-  const rafRef = useRef<number>()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const arcRef = useRef<SVGSVGElement>(null)
+  const ringRef = useRef<HTMLDivElement>(null)
+  const dotRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      posRef.current = { x: e.clientX, y: e.clientY }
-      const el = e.target as HTMLElement
-      setIsHover(!!(el.closest("button") || el.closest("a")))
-    }
-    const onDown = () => setIsClick(true)
-    const onUp = () => setIsClick(false)
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mousedown", onDown)
-    window.addEventListener("mouseup", onUp)
+    // ── Inject global cursor:none so it NEVER leaks through buttons/links ──
+    const styleEl = document.createElement("style")
+    styleEl.textContent = "*, *::before, *::after { cursor: none !important; }"
+    document.head.appendChild(styleEl)
 
-    const animate = () => {
-      arcAngleRef.current += 1.8
-      setArcAngle(arcAngleRef.current)
-      setRenderPos({ ...posRef.current })
-      rafRef.current = requestAnimationFrame(animate)
+    let angle = 0
+    let rafId: number
+    // Track raw values — no React state involved
+    let mx = -300, my = -300
+    let isHover = false, isClick = false
+
+    const onMove = (e: MouseEvent) => {
+      mx = e.clientX
+      my = e.clientY
+      const el = e.target as HTMLElement
+      isHover = !!(el.closest("button") || el.closest("a"))
     }
-    rafRef.current = requestAnimationFrame(animate)
+    const onDown = () => { isClick = true }
+    const onUp = () => { isClick = false }
+
+    // Passive listeners — zero scroll jank
+    window.addEventListener("mousemove", onMove, { passive: true })
+    window.addEventListener("mousedown", onDown, { passive: true })
+    window.addEventListener("mouseup", onUp, { passive: true })
+
+    const tick = () => {
+      angle += 1.8
+
+      // ── Move container with GPU-composited translate3d ──────────────────
+      if (containerRef.current) {
+        containerRef.current.style.transform = `translate3d(${mx - 50}px,${my - 50}px,0)`
+      }
+
+      // ── Spin arc SVG ────────────────────────────────────────────────────
+      if (arcRef.current) {
+        arcRef.current.style.transform = `rotate(${angle}deg)`
+      }
+
+      // ── Expand ring on hover ─────────────────────────────────────────────
+      if (ringRef.current) {
+        const size = isHover ? 52 : 36
+        ringRef.current.style.width = `${size}px`
+        ringRef.current.style.height = `${size}px`
+        ringRef.current.style.marginLeft = `${-size / 2}px`
+        ringRef.current.style.marginTop = `${-size / 2}px`
+        ringRef.current.style.borderColor = isHover
+          ? "rgba(6,182,212,0.9)"
+          : "rgba(6,182,212,0.6)"
+      }
+
+      // ── Pulse dot on click ───────────────────────────────────────────────
+      if (dotRef.current) {
+        const ds = isClick ? 8 : 4
+        dotRef.current.style.width = `${ds}px`
+        dotRef.current.style.height = `${ds}px`
+        dotRef.current.style.marginLeft = `${-ds / 2}px`
+        dotRef.current.style.marginTop = `${-ds / 2}px`
+      }
+
+      rafId = requestAnimationFrame(tick)
+    }
+
+    rafId = requestAnimationFrame(tick)
 
     return () => {
+      document.head.removeChild(styleEl)
       window.removeEventListener("mousemove", onMove)
       window.removeEventListener("mousedown", onDown)
       window.removeEventListener("mouseup", onUp)
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      cancelAnimationFrame(rafId)
     }
   }, [])
 
-  const outerR = isHover ? 26 : isClick ? 14 : 18
-  const svgSize = (outerR + 12) * 2
-  const cx = svgSize / 2
-  const cy = svgSize / 2
-  const arcR = outerR + 8
-  const circ = 2 * Math.PI * arcR
-  const dashLen = circ * 0.22
-
   return (
+    // Fixed 100×100 box anchored at top-left; moved via translate3d
     <div
+      ref={containerRef}
       aria-hidden="true"
-      className="pointer-events-none fixed z-[9999]"
-      style={{ left: renderPos.x, top: renderPos.y, transform: "translate(-50%,-50%)" }}
+      style={{
+        position: "fixed",
+        top: 0, left: 0,
+        width: 100, height: 100,
+        pointerEvents: "none",
+        zIndex: 9999,
+        willChange: "transform",          // own compositor layer — zero paint cost
+        transform: "translate3d(-300px,-300px,0)",
+      }}
     >
-      {/* Rotating dashed outer arc */}
+      {/* Rotating dual-arc SVG — only transform changes, no layout */}
       <svg
-        width={svgSize}
-        height={svgSize}
+        ref={arcRef}
+        width={100} height={100}
         style={{
-          position: "absolute",
-          top: "50%", left: "50%",
-          transform: `translate(-50%,-50%) rotate(${arcAngle}deg)`,
-          transition: "width 0.15s ease, height 0.15s ease",
+          position: "absolute", top: 0, left: 0,
+          transformOrigin: "50px 50px",   // rotate around container center
           overflow: "visible",
         }}
       >
-        <circle
-          cx={cx} cy={cy} r={arcR}
-          fill="none"
-          stroke="rgba(6,182,212,0.85)"
-          strokeWidth="1"
-          strokeDasharray={`${dashLen} ${circ - dashLen}`}
-          strokeLinecap="round"
+        <circle cx={50} cy={50} r={27}
+          fill="none" stroke="rgba(6,182,212,0.85)" strokeWidth="1"
+          strokeDasharray="17 52" strokeLinecap="round"
         />
-        <circle
-          cx={cx} cy={cy} r={arcR}
-          fill="none"
-          stroke="rgba(56,189,248,0.5)"
-          strokeWidth="1"
-          strokeDasharray={`${dashLen * 0.6} ${circ - dashLen * 0.6}`}
-          strokeDashoffset={-(circ / 2)}
-          strokeLinecap="round"
+        <circle cx={50} cy={50} r={27}
+          fill="none" stroke="rgba(56,189,248,0.5)" strokeWidth="1"
+          strokeDasharray="11 58" strokeDashoffset="34" strokeLinecap="round"
         />
       </svg>
 
-      {/* Static outer targeting ring */}
-      <div style={{
-        position: "absolute", top: "50%", left: "50%",
-        width: outerR * 2, height: outerR * 2,
-        borderRadius: "50%",
-        border: `1px solid rgba(6,182,212,${isHover ? 0.9 : 0.55})`,
-        transform: "translate(-50%,-50%)",
-        boxShadow: `0 0 10px rgba(6,182,212,0.3), inset 0 0 8px rgba(6,182,212,0.08)`,
-        transition: "all 0.15s ease",
-      }} />
+      {/* Targeting ring — size updated via direct style in tick() */}
+      <div
+        ref={ringRef}
+        style={{
+          position: "absolute", top: "50%", left: "50%",
+          width: 36, height: 36,
+          marginLeft: -18, marginTop: -18,
+          borderRadius: "50%",
+          border: "1px solid rgba(6,182,212,0.6)",
+          boxShadow: "0 0 10px rgba(6,182,212,0.3), inset 0 0 6px rgba(6,182,212,0.08)",
+          transition: "width 0.15s ease, height 0.15s ease, margin 0.15s ease, border-color 0.15s ease",
+        }}
+      />
 
-      {/* Corner bracket notches at 4 quadrant edges */}
+      {/* 4 crosshair bracket ticks — static, no animation */}
       {[0, 90, 180, 270].map((deg) => (
         <div key={deg} style={{
           position: "absolute", top: "50%", left: "50%",
-          width: isHover ? 9 : 7,
-          height: "1px",
+          width: 7, height: 1,
           background: "rgba(6,182,212,0.9)",
-          boxShadow: "0 0 5px rgba(6,182,212,0.7)",
+          boxShadow: "0 0 4px rgba(6,182,212,0.7)",
           transformOrigin: "0 50%",
-          transform: `rotate(${deg}deg) translateX(${outerR + 5}px) translateY(-50%)`,
-          transition: "all 0.15s ease",
+          transform: `rotate(${deg}deg) translateX(23px) translateY(-50%)`,
         }} />
       ))}
 
-      {/* Inner dot */}
-      <div style={{
-        position: "absolute", top: "50%", left: "50%",
-        width: isClick ? 8 : 4, height: isClick ? 8 : 4,
-        borderRadius: "50%",
-        background: "rgba(6,182,212,1)",
-        boxShadow: "0 0 8px rgba(6,182,212,1), 0 0 16px rgba(6,182,212,0.5)",
-        transform: "translate(-50%,-50%)",
-        transition: "all 0.1s ease",
-      }} />
+      {/* Center dot — size updated via direct style in tick() */}
+      <div
+        ref={dotRef}
+        style={{
+          position: "absolute", top: "50%", left: "50%",
+          width: 4, height: 4,
+          marginLeft: -2, marginTop: -2,
+          borderRadius: "50%",
+          background: "rgba(6,182,212,1)",
+          boxShadow: "0 0 8px rgba(6,182,212,1), 0 0 16px rgba(6,182,212,0.5)",
+          transition: "width 0.1s ease, height 0.1s ease, margin 0.1s ease",
+        }}
+      />
     </div>
   )
 }
