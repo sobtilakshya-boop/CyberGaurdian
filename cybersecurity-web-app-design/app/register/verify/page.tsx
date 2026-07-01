@@ -95,12 +95,10 @@ export default function VerifyPage() {
 
   // ─── Submit OTP ──────────────────────────────────────────────────────────────
   const handleVerify = useCallback(async () => {
-    const code = otp.join("")
-    console.log("[v0] OTP array:", otp)
-    console.log("[v0] OTP code:", code)
-    console.log("[v0] OTP code length:", code.length)
+    // Filter out any empty strings and join
+    const code = otp.filter(d => d).join("")
     
-    if (code.length < 6 || !/^\d{6}$/.test(code)) {
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
       setStatus("error")
       setMessage("Please enter all 6 digits of your OTP.")
       return
