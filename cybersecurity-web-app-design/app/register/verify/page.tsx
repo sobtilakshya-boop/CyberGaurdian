@@ -106,11 +106,20 @@ export default function VerifyPage() {
     setMessage("")
 
     try {
+      // Get registration data from sessionStorage as fallback if cookie doesn't persist
+      const sessionData = {
+        name: sessionStorage.getItem("cg_pending_name"),
+        email: sessionStorage.getItem("cg_pending_email"),
+        phone: sessionStorage.getItem("cg_pending_phone"),
+        password: sessionStorage.getItem("cg_pending_password"),
+        confirmPassword: sessionStorage.getItem("cg_pending_confirmPassword"),
+      }
+
       const res = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ otp: code }),
+        body: JSON.stringify({ otp: code, sessionData }),
       })
       const data = await res.json()
 

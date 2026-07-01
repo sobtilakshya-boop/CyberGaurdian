@@ -129,10 +129,12 @@ export async function POST(request: NextRequest) {
     const cookieHeader = serialize('registration_intent', registrationPayload, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Use 'lax' instead of 'strict' for better compatibility with fetch
       path: '/',
       maxAge: 60 * 15, // 15 minutes — enough to complete OTP flow
     })
+
+    console.log('[register-intent] Setting cookie with maxAge:', 60 * 15, 'NODE_ENV:', process.env.NODE_ENV)
 
     return NextResponse.json(
       { success: true, message: 'OTP sent successfully.' },

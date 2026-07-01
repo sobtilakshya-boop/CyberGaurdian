@@ -13,6 +13,13 @@ const VerifyOtpSchema = z.object({
     .string()
     .length(6, 'OTP must be exactly 6 digits')
     .regex(/^\d{6}$/, 'OTP must contain only digits'),
+  sessionData: z.object({
+    name: z.string().optional(),
+    email: z.string().optional(),
+    phone: z.string().optional(),
+    password: z.string().optional(),
+    confirmPassword: z.string().optional(),
+  }).optional(),
 })
 
 interface RegistrationIntent {
@@ -37,41 +44,52 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { otp } = parsed.data
+    const { otp, sessionData } = parsed.data
 
-    // Read registration context from cookie — try both cookie header and cookies() API
+    // Try to read registration context from cookie first
+    let intent: RegistrationIntent | null = null
     let rawIntent = ""
     
     try {
       const cookieStore = await cookies()
       rawIntent = cookieStore.get('registration_intent')?.value ?? ""
-    } catch {
+    } catch (e) {
       // Fallback to header parsing if cookies() fails
       const cookieHeader = request.headers.get('cookie') ?? ''
       const parsedCookies = parse(cookieHeader)
       rawIntent = parsedCookies['registration_intent'] ?? ""
     }
 
-    if (!rawIntent) {
-      return NextResponse.json(
-        { success: false, error: 'Registration session expired. Please start over.' },
-        { status: 401 }
-      )
+    if (rawIntent) {
+      try {
+        intent = JSON.parse(Buffer.from(rawIntent, 'base64').toString('utf-8')) as RegistrationIntent
+        // Verify cookie is not stale (15 min max)
+        if (Date.now() - intent.issuedAt > 15 * 60 * 1000) {
+          intent = null
+        }
+      } catch {
+        intent = null
+      }
     }
 
-    // Decode registration data
-    let intent: RegistrationIntent
-    try {
-      intent = JSON.parse(Buffer.from(rawIntent, 'base64').toString('utf-8')) as RegistrationIntent
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Corrupted registration session. Please start over.' },
-        { status: 400 }
-      )
+    // If no cookie, try to reconstruct from sessionData (client-side fallback)
+    if (!intent && sessionData?.phone && sessionData?.name && sessionData?.email) {
+      // Hash the password from sessionData
+      const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10)
+      const passwordHash = await (await import('bcryptjs')).default.hash(sessionData.password || '', rounds)
+      
+      intent = {
+        name: sessionData.name,
+        email: sessionData.email,
+        phone: sessionData.phone,
+        passwordHash,
+        issuedAt: Date.now(),
+      }
+      console.log('[verify-otp] Reconstructed registration intent from sessionData')
     }
 
-    // Verify cookie is not stale (15 min max)
-    if (Date.now() - intent.issuedAt > 15 * 60 * 1000) {
+    if (!intent) {
+      console.log('[verify-otp] ⚠ No registration_intent found (no cookie and no sessionData)')
       return NextResponse.json(
         { success: false, error: 'Registration session expired. Please start over.' },
         { status: 401 }
