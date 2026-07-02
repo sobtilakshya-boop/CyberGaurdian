@@ -6,9 +6,9 @@ import { chapters } from '@/data/courseData'
 import { AlertTriangle, Info, TrendingUp, Search, Calendar, ShieldAlert } from 'lucide-react'
 
 const severityConfig = {
-  high:   { icon: AlertTriangle, color: 'border-red-500/25 bg-red-500/5 text-red-400', badge: 'bg-red-500/15 border-red-500/25 text-red-400', label: 'Critical Threat' },
-  medium: { icon: TrendingUp,    color: 'border-yellow-500/25 bg-yellow-500/5 text-yellow-400', badge: 'bg-yellow-500/15 border-yellow-500/25 text-yellow-400', label: 'Medium Risk' },
-  low:    { icon: Info,           color: 'border-cyan-500/25 bg-cyan-500/5 text-cyan-400', badge: 'bg-cyan-500/15 border-cyan-500/25 text-cyan-400', label: 'Awareness Advisory' },
+  high:   { icon: AlertTriangle, color: 'border-red-500/30 bg-gradient-to-r from-red-500/10 via-white/40 to-white/60 text-red-700', badge: 'bg-red-500/10 border-red-500/20 text-red-600', label: 'Critical Threat' },
+  medium: { icon: TrendingUp,    color: 'border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 via-white/40 to-white/60 text-yellow-750', badge: 'bg-yellow-500/10 border-yellow-500/20 text-yellow-700', label: 'Medium Risk' },
+  low:    { icon: Info,           color: 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/10 via-white/40 to-white/60 text-cyan-700', badge: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-600', label: 'Awareness Advisory' },
 }
 
 export default function NewsPage() {
@@ -36,14 +36,15 @@ export default function NewsPage() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col gap-1.5 pb-6 border-b border-slate-800">
-        <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-widest">
+      <div className="flex flex-col gap-1.5 pb-6 border-b border-[var(--db-border-strong)]">
+        <div className="bg-gradient-to-r from-red-500 via-yellow-500 to-cyan-500 h-1.5 w-24 rounded-full mb-2" />
+        <span className="font-mono text-[10px] text-[var(--db-accent)] uppercase tracking-widest font-bold">
           Global Telemetry Intel Feed
         </span>
-        <h1 className="text-2xl font-bold font-mono tracking-tight text-white uppercase">
+        <h1 className="text-2xl font-bold font-mono tracking-tight text-[var(--db-text-primary)] uppercase">
           Threat News & Awareness
         </h1>
-        <p className="text-xs text-slate-500 font-mono max-w-3xl">
+        <p className="text-xs text-[var(--db-text-secondary)] font-mono max-w-3xl leading-relaxed">
           Real-time ingestion of global security advisories, vulnerability bulletins, and tactical threat intelligence.
         </p>
       </div>
@@ -51,18 +52,18 @@ export default function NewsPage() {
       {/* Control Bar: Filter Tabs + Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2">
         {/* Filter Tabs */}
-        <div className="flex items-center gap-1.5 border border-slate-850 p-1.5 rounded-xl bg-slate-950/40 backdrop-blur-md self-start">
+        <div className="flex items-center gap-1.5 border border-[var(--db-border-strong)] p-1.5 rounded-xl bg-white/70 backdrop-blur-md self-start">
           {(['all', 'high', 'medium', 'low'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveFilter(tab)}
               className={`px-4 py-1.5 rounded-lg font-mono text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer ${
                 activeFilter === tab
-                  ? tab === 'high' ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : tab === 'medium' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                    : tab === 'low' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                    : 'bg-slate-800 text-white border border-slate-700'
-                  : 'bg-transparent text-slate-500 hover:text-slate-350 border border-transparent'
+                  ? tab === 'high' ? 'bg-red-500/20 text-red-650 border border-red-500/30'
+                    : tab === 'medium' ? 'bg-yellow-500/20 text-yellow-700 border border-yellow-500/30'
+                    : tab === 'low' ? 'bg-cyan-500/20 text-cyan-650 border border-cyan-500/30'
+                    : 'bg-slate-200 text-slate-800 border border-slate-300'
+                  : 'bg-transparent text-slate-500 hover:text-slate-700 border border-transparent'
               }`}
             >
               {tab === 'all' ? 'All Alerts' : `${tab} Risk`}
@@ -78,7 +79,7 @@ export default function NewsPage() {
             placeholder="Filter by keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-800 bg-slate-950/20 py-2.5 pl-10 pr-4 text-xs font-mono text-white outline-none transition-all placeholder:text-slate-600 focus:border-cyan-500 focus:shadow-[0_0_0_2px_rgba(6,182,212,0.15)]"
+            className="w-full rounded-xl border border-[var(--db-border-strong)] bg-white/70 py-2.5 pl-10 pr-4 text-xs font-mono text-[var(--db-text-primary)] outline-none transition-all placeholder:text-slate-400 focus:border-cyan-500 focus:shadow-[0_0_0_2px_rgba(6,182,212,0.1)]"
           />
         </div>
       </div>
@@ -99,9 +100,10 @@ export default function NewsPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.25 }}
-                  className={`rounded-2xl border p-5 bg-slate-900/10 backdrop-blur-md flex flex-col sm:flex-row gap-4 transition-all duration-305 hover:border-slate-700 ${config.color}`}
+                  className={`rounded-2xl border p-5 backdrop-blur-md flex flex-col sm:flex-row gap-4 transition-all duration-300 hover:border-slate-400 ${config.color}`}
+                  style={{ boxShadow: 'var(--db-shadow-sm)' }}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950/60 border border-slate-800/80">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/90 border border-slate-200">
                     <Icon className="h-5 w-5" />
                   </div>
 
@@ -111,22 +113,22 @@ export default function NewsPage() {
                         <span className={`px-2 py-0.5 rounded-md border font-mono text-[9px] font-bold uppercase tracking-wider ${config.badge}`}>
                           {config.label}
                         </span>
-                        <span className="font-mono text-[10px] text-slate-500 flex items-center gap-1.5">
+                        <span className="font-mono text-[10px] text-[var(--db-text-muted)] flex items-center gap-1.5">
                           <Calendar className="h-3 w-3" />
                           Ingested from Chapter {item.chapterId}
                         </span>
                       </div>
-                      <h4 className="font-mono text-sm font-bold text-white leading-tight mb-2">
+                      <h4 className="font-mono text-sm font-bold text-[var(--db-text-primary)] leading-tight mb-2">
                         {item.headline}
                       </h4>
-                      <p className="font-mono text-xs text-slate-400 leading-relaxed">
+                      <p className="font-mono text-xs text-[var(--db-text-secondary)] leading-relaxed">
                         {item.summary}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-900/60 pt-3 text-[10px] font-mono text-slate-500 flex-wrap gap-2">
-                      <span>Source: <strong className="text-slate-400">{item.source}</strong></span>
-                      <span className="text-cyan-400 uppercase tracking-widest text-[9px] font-bold">
+                    <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-[10px] font-mono text-[var(--db-text-muted)] flex-wrap gap-2">
+                      <span>Source: <strong className="text-[var(--db-text-secondary)]">{item.source}</strong></span>
+                      <span className="text-[var(--db-accent)] uppercase tracking-widest text-[9px] font-bold">
                         {item.chapterTitle}
                       </span>
                     </div>
@@ -138,9 +140,9 @@ export default function NewsPage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-2xl border border-dashed border-slate-800 p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-500"
+              className="rounded-2xl border border-dashed border-[var(--db-border-strong)] bg-white/40 p-12 text-center flex flex-col items-center justify-center gap-3 text-[var(--db-text-muted)]"
             >
-              <ShieldAlert className="h-10 w-10 text-slate-600 animate-bounce" />
+              <ShieldAlert className="h-10 w-10 text-slate-400 animate-bounce" />
               <p className="font-mono text-sm">No tactical advisories match your filter criteria.</p>
             </motion.div>
           )}

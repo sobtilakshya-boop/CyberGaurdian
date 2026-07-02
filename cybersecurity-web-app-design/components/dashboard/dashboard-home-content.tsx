@@ -46,19 +46,40 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
     if (isChapterUnlocked(i)) continueChapterId = i
   }
 
-  // Fetch live/demo metrics from server route
+  // Fetch live/demo metrics from server route (polling every 4 seconds)
   useEffect(() => {
-    fetch(`/api/dashboard/metrics?xp=${progress.xp}&pct=${overallPct}`)
-      .then(r => r.json())
-      .then(setMetrics)
-      .catch(() => setMetrics({ 
-        userCount: 1, 
-        securityScore: Math.min(100, 75 + Math.round(overallPct * 0.25)), 
-        activeThreats: Math.max(0, 4 - Math.floor(overallPct / 25)), 
-        logsProcessed: 8400 + progress.xp * 8, 
-        isDemoData: false 
-      }))
+    const fetchMetrics = () => {
+      fetch(`/api/dashboard/metrics?xp=${progress.xp}&pct=${overallPct}`)
+        .then(r => r.json())
+        .then(setMetrics)
+        .catch(() => setMetrics({ 
+          userCount: 1, 
+          securityScore: Math.min(100, 75 + Math.round(overallPct * 0.25)), 
+          activeThreats: Math.max(0, 4 - Math.floor(overallPct / 25)), 
+          logsProcessed: 8400 + progress.xp * 8, 
+          isDemoData: false 
+        }))
+    }
+
+    fetchMetrics()
+    const interval = setInterval(fetchMetrics, 4000)
+    return () => clearInterval(interval)
   }, [progress.xp, overallPct])
+
+  // Live client-side ticker for Logs Processed count
+  useEffect(() => {
+    if (!metrics) return
+    const interval = setInterval(() => {
+      setMetrics(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          logsProcessed: prev.logsProcessed + Math.floor(Math.random() * 3) + 1
+        }
+      })
+    }, 1200)
+    return () => clearInterval(interval)
+  }, [metrics === null])
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">

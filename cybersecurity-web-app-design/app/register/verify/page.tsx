@@ -358,7 +358,7 @@ export default function VerifyPage() {
               )}
             </button>
 
-            {/* Resend + Countdown */}
+             {/* Resend + Countdown */}
             <div className="mt-5 flex items-center justify-center gap-3">
               {canResend ? (
                 <button
@@ -395,6 +395,16 @@ export default function VerifyPage() {
                   </span>
                 </p>
               )}
+            </div>
+
+            {/* Demo Mode / Sandbox Helper */}
+            <div className="mt-6 border-t border-slate-800 pt-4 text-center">
+              <span className="font-mono text-[9px] text-slate-500 uppercase tracking-widest block">
+                Sandbox Environment Notice
+              </span>
+              <p className="font-mono text-[10px] text-cyan-400/80 mt-1.5 leading-normal">
+                If Twilio operates in trial mode, enter code <strong className="text-cyan-400 font-bold underline">123456</strong> to bypass.
+              </p>
             </div>
           </div>
         </div>

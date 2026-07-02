@@ -34,7 +34,7 @@ export default function CertificatesPage() {
       .catch(() => {})
   }, [])
 
-  // Crytographic Certificate Verification Hash
+  // Cryptographic Certificate Verification Hash
   const hashSignature = session
     ? Array.from(session.userId + '-completed-cyberguardian')
         .reduce((s, c) => (Math.imul(31, s) + c.charCodeAt(0)) | 0, 0)
@@ -49,14 +49,15 @@ export default function CertificatesPage() {
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto print:p-0">
       {/* Page Header (Hidden on Print) */}
-      <div className="flex flex-col gap-1.5 pb-6 border-b border-slate-800 print:hidden">
-        <span className="font-mono text-[10px] text-cyan-400 uppercase tracking-widest">
+      <div className="flex flex-col gap-1.5 pb-6 border-b border-[var(--db-border-strong)] print:hidden">
+        <div className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 h-1.5 w-24 rounded-full mb-2" />
+        <span className="font-mono text-[10px] text-[var(--db-accent)] uppercase tracking-widest font-bold">
           Academic Credentials
         </span>
-        <h1 className="text-2xl font-bold font-mono tracking-tight text-white uppercase">
+        <h1 className="text-2xl font-bold font-mono tracking-tight text-[var(--db-text-primary)] uppercase">
           Certificates & Badges
         </h1>
-        <p className="text-xs text-slate-500 font-mono">
+        <p className="text-xs text-[var(--db-text-secondary)] font-mono leading-relaxed">
           Unlock your cryptographically signed completion certificate and audit your learning badges.
         </p>
       </div>
@@ -158,41 +159,47 @@ export default function CertificatesPage() {
           /* LOCKED STATE: Progress bar + lock overlay */
           <div className="flex flex-col lg:flex-row gap-8 items-stretch">
             {/* Locked Visual Preview Card */}
-            <div className="flex-1 rounded-2xl border border-slate-800/80 bg-slate-900/10 backdrop-blur-md p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden min-h-[360px]">
+            <div 
+              className="flex-1 rounded-2xl border bg-white/80 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden min-h-[360px]"
+              style={{ border: '1px solid var(--db-border-strong)', boxShadow: 'var(--db-shadow-md)' }}
+            >
               {/* Blur backdrop overlay */}
-              <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[6px] z-10 flex flex-col items-center justify-center gap-4 text-slate-400">
-                <div className="h-14 w-14 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center shadow-lg animate-pulse">
-                  <Lock className="h-6 w-6 text-cyan-400" />
+              <div className="absolute inset-0 bg-white/60 backdrop-blur-[6px] z-10 flex flex-col items-center justify-center gap-4 text-[var(--db-text-secondary)]">
+                <div className="h-14 w-14 rounded-full bg-white border border-[var(--db-border-strong)] flex items-center justify-center shadow-lg animate-pulse">
+                  <Lock className="h-6 w-6 text-[var(--db-accent)]" />
                 </div>
                 <div className="text-center px-4 max-w-sm">
-                  <h3 className="font-mono text-sm font-bold text-white uppercase tracking-wider mb-1">
+                  <h3 className="font-mono text-sm font-bold text-[var(--db-text-primary)] uppercase tracking-wider mb-1">
                     Certificate Locked
                   </h3>
-                  <p className="font-mono text-[11px] text-slate-500 leading-normal">
+                  <p className="font-mono text-[11px] text-[var(--db-text-secondary)] leading-normal">
                     Complete all 9 course curriculum chapters to sign and unlock your cryptography certificate.
                   </p>
                 </div>
               </div>
 
               {/* Faux Certificate Background layout */}
-              <div className="opacity-15 flex flex-col items-center text-center">
+              <div className="opacity-10 flex flex-col items-center text-center">
                 <ShieldCheck className="h-10 w-10 text-slate-400 mb-2" />
                 <span className="font-mono text-xs font-bold text-slate-400 uppercase tracking-widest">CYBERGUARDIAN CERTIFICATE</span>
-                <div className="h-6 w-48 bg-slate-800 rounded mt-8 mb-4 mx-auto" />
-                <div className="h-3 w-72 bg-slate-800 rounded mx-auto" />
-                <div className="h-3 w-56 bg-slate-800 rounded mt-2 mx-auto" />
+                <div className="h-6 w-48 bg-slate-200 rounded mt-8 mb-4 mx-auto" />
+                <div className="h-3 w-72 bg-slate-200 rounded mx-auto" />
+                <div className="h-3 w-56 bg-slate-200 rounded mt-2 mx-auto" />
               </div>
 
               {/* Progress Ring at Bottom */}
-              <div className="opacity-15 flex justify-between pt-6 border-t border-slate-800">
-                <div className="h-3 w-24 bg-slate-800 rounded" />
-                <div className="h-3 w-20 bg-slate-800 rounded" />
+              <div className="opacity-10 flex justify-between pt-6 border-t border-slate-200">
+                <div className="h-3 w-24 bg-slate-200 rounded" />
+                <div className="h-3 w-20 bg-slate-200 rounded" />
               </div>
             </div>
 
             {/* Checklist of Chapters (Lock Tracker) */}
-            <div className="w-full lg:w-96 rounded-2xl border border-slate-800/80 bg-slate-900/30 backdrop-blur-md p-5 flex flex-col gap-4">
-              <h3 className="font-mono text-xs font-bold text-slate-200 uppercase tracking-wider pb-3 border-b border-slate-800">
+            <div 
+              className="w-full lg:w-96 rounded-2xl border p-5 flex flex-col gap-4"
+              style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid var(--db-border-strong)', boxShadow: 'var(--db-shadow-md)' }}
+            >
+              <h3 className="font-mono text-xs font-bold text-[var(--db-text-primary)] uppercase tracking-wider pb-3 border-b border-[var(--db-border)]">
                 Certificate Checklist ({completedCount}/9)
               </h3>
               
@@ -204,22 +211,22 @@ export default function CertificatesPage() {
                       key={chapter.id}
                       className={`flex items-center justify-between p-3 rounded-xl border font-mono text-[11px] ${
                         done
-                          ? 'bg-green-500/5 border-green-500/10 text-green-400'
-                          : 'bg-slate-950/20 border-slate-900 text-slate-400'
+                          ? 'bg-green-500/10 border-green-500/25 text-green-700 font-semibold'
+                          : 'bg-[var(--db-surface-2)]/60 border-[var(--db-border)] text-[var(--db-text-secondary)]'
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {done ? (
-                          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-400" />
+                          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
                         ) : (
-                          <Lock className="h-4 w-4 shrink-0 text-slate-600" />
+                          <Lock className="h-4 w-4 shrink-0 text-slate-400" />
                         )}
                         <span className="truncate">{chapter.id}. {chapter.title}</span>
                       </div>
                       
                       {!done && (
                         <Link href={`/dashboard/course`}>
-                          <span className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold shrink-0 flex items-center gap-0.5">
+                          <span className="text-[10px] text-[var(--db-accent)] hover:text-cyan-600 font-bold shrink-0 flex items-center gap-0.5">
                             Start <ChevronRight className="h-3 w-3" />
                           </span>
                         </Link>
@@ -232,7 +239,6 @@ export default function CertificatesPage() {
           </div>
         )}
       </div>
-
     </div>
   )
 }

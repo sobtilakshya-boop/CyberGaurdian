@@ -68,6 +68,7 @@ export default function StatCard({
         border: '1px solid var(--db-border)',
         boxShadow: 'var(--db-shadow-md)',
         backdropFilter: 'blur(12px)',
+        zIndex: showTooltip ? 50 : 1,
       }}
     >
       {/* Subtle accent tint corner */}
