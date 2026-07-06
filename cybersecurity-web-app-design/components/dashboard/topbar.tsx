@@ -70,11 +70,8 @@ export default function Topbar({ user }: TopbarProps) {
       <header
         className="flex w-full items-center justify-between px-6 py-3 z-20 sticky top-0"
         style={{
-          background: 'rgba(255,255,255,0.80)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
+          background: 'var(--db-surface)',
           borderBottom: '1px solid var(--db-border)',
-          boxShadow: 'var(--db-shadow-sm)',
         }}
       >
         {/* Left: Mobile toggle + Breadcrumbs */}

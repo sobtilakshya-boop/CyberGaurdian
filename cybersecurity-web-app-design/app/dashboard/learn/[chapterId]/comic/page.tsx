@@ -8,6 +8,7 @@ import ComicViewer from '@/components/dashboard/comic-viewer'
 import QuizEngine from '@/components/dashboard/quiz-engine'
 import { ArrowLeft, BookOpen, Video, Book, Gamepad, Puzzle, FileCheck2, CheckCircle, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 
 export default function ComicSectionPage() {
   const params = useParams()

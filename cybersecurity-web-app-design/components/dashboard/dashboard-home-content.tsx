@@ -9,33 +9,38 @@ import ProgressRing from '@/components/dashboard/progress-ring'
 import DailyTipCard from '@/components/dashboard/daily-tip-card'
 import StatCard from '@/components/dashboard/stat-card'
 import ChapterCompleteModal from '@/components/dashboard/chapter-complete-modal'
+import SectorExploreWidget from '@/components/dashboard/sector-explore-widget'
 import { BookOpen, Flame, Award, ArrowRight, GraduationCap, ShieldCheck } from 'lucide-react'
+import { supabasePublic } from '@/lib/supabase'
 
 // Lazy-load the 3D scene to keep initial paint fast
 const AstronautScene = lazy(() => import('@/components/dashboard/astronaut-scene'))
+// Lazy-load the attack map (heavy 3D canvas)
+const AttackMap = lazy(() => import('@/components/dashboard/attack-map'))
 
 interface UserSession { userId: string; name: string; email: string; phone: string }
 
 interface DashboardMetrics {
   userCount: number
-  securityScore: number
-  activeThreats: number
-  logsProcessed: number
+  activeLearners: number
+  globalXp: number
+  badgesClaimed: number
   isDemoData: boolean
 }
 
 interface DashboardHomeContentProps { user: UserSession }
 
 const METRIC_TOOLTIPS = {
-  securityScore: 'Calculated from device patch status, MFA coverage, endpoint protection health, and password hygiene scores across all registered users. 100% = fully hardened posture.',
   userCount: 'Total number of verified accounts in the CyberGuardian system with completed email and phone verification.',
-  activeThreats: 'Active threat vectors identified by the telemetry engine across your connected digital environment. 0 = clean.',
-  logsProcessed: 'Total real-time security event logs ingested and analyzed by the monitoring engine in the current session.',
+  activeLearners: 'Concurrent operators currently logged into the training matrix studying cyber hygiene enclaves.',
+  globalXp: 'Aggregated Experience Points (XP) earned by all operators across global training simulations.',
+  badgesClaimed: 'Total security badges, modules, and certifications successfully unlocked by platform operators.',
 }
 
 export default function DashboardHomeContent({ user }: DashboardHomeContentProps) {
   const { progress, getOverallPercent, getCompletedCount, isChapterUnlocked } = useProgress()
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [activeLearners, setActiveLearners] = useState(1)
 
   const overallPct = getOverallPercent()
   const completedCount = getCompletedCount()
@@ -46,40 +51,82 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
     if (isChapterUnlocked(i)) continueChapterId = i
   }
 
-  // Fetch live/demo metrics from server route (polling every 4 seconds)
+  // Fetch live metrics using Server-Sent Events (SSE) for true real-time updates
   useEffect(() => {
-    const fetchMetrics = () => {
+    const eventSource = new EventSource(`/api/dashboard/metrics/stream?xp=${progress.xp}&pct=${overallPct}`)
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const liveData = JSON.parse(event.data)
+        setMetrics(liveData)
+      } catch (err) {
+        console.error("Error parsing streamed metrics:", err)
+      }
+    }
+
+    eventSource.onerror = (err) => {
+      console.error("SSE stream error, falling back to polling metrics:", err)
+      // Fallback in case of serverless timeout or proxy issues
       fetch(`/api/dashboard/metrics?xp=${progress.xp}&pct=${overallPct}`)
         .then(r => r.json())
         .then(setMetrics)
-        .catch(() => setMetrics({ 
-          userCount: 1, 
-          securityScore: Math.min(100, 75 + Math.round(overallPct * 0.25)), 
-          activeThreats: Math.max(0, 4 - Math.floor(overallPct / 25)), 
-          logsProcessed: 8400 + progress.xp * 8, 
-          isDemoData: false 
-        }))
+        .catch(() => {})
+      eventSource.close()
     }
 
-    fetchMetrics()
-    const interval = setInterval(fetchMetrics, 4000)
-    return () => clearInterval(interval)
+    return () => {
+      eventSource.close()
+    }
   }, [progress.xp, overallPct])
 
-  // Live client-side ticker for Logs Processed count
+
+
+  // Track active learners via Supabase Realtime Presence with a fallback for local mock environments
   useEffect(() => {
-    if (!metrics) return
-    const interval = setInterval(() => {
-      setMetrics(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          logsProcessed: prev.logsProcessed + Math.floor(Math.random() * 3) + 1
+    // Check if Supabase keys are actual or placeholders
+    const isSupabaseActive = 
+      process.env.NEXT_PUBLIC_SUPABASE_URL && 
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('placeholder') &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
+      !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('placeholder')
+
+    if (!isSupabaseActive) {
+      // Fallback: Localhost mock simulation (fluctuates active count dynamically for visual preview)
+      const interval = setInterval(() => {
+        setActiveLearners(prev => {
+          const change = Math.random() > 0.5 ? 1 : -1
+          return Math.max(1, Math.min(10, prev + change))
+        })
+      }, 3000)
+      return () => clearInterval(interval)
+    }
+
+    // Connect to Supabase Realtime Presence channel
+    const channel = supabasePublic.channel('online-users', {
+      config: {
+        presence: {
+          key: user.userId,
+        },
+      },
+    })
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState()
+        // Count unique user IDs present in the channel
+        const count = Object.keys(state).length
+        setActiveLearners(count)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ online_at: new Date().toISOString(), user_name: user.name })
         }
       })
-    }, 1200)
-    return () => clearInterval(interval)
-  }, [metrics === null])
+
+    return () => {
+      supabasePublic.removeChannel(channel)
+    }
+  }, [user.userId, user.name])
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
@@ -166,8 +213,8 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
           >
             <Link href={`/dashboard/course/${continueChapterId}`}>
               <button
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-white font-bold text-sm transition-all cursor-pointer"
-                style={{ background: 'linear-gradient(135deg, var(--db-accent), #8B5CF6)', boxShadow: 'var(--db-shadow-glow)' }}
+                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl text-white font-bold text-sm transition-all cursor-pointer shadow-md hover:shadow-lg"
+                style={{ background: 'var(--db-accent)' }}
                 onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
               >
@@ -197,39 +244,56 @@ export default function DashboardHomeContent({ user }: DashboardHomeContentProps
       {/* ── Metric Stat Cards ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
-          title="Security Score"
-          value={metrics?.securityScore ?? 0}
-          suffix="%"
-          subtext="Overall device & account hygiene rating"
-          iconType="shield"
-          tooltipText={METRIC_TOOLTIPS.securityScore}
-          isDemo={metrics?.isDemoData}
-        />
-        <StatCard
           title="Verified Users"
           value={metrics?.userCount ?? 0}
-          subtext="Authenticated operators in the system"
+          subtext="Total accounts registered in the database"
           iconType="users"
           tooltipText={METRIC_TOOLTIPS.userCount}
           isDemo={metrics?.isDemoData}
         />
         <StatCard
-          title="Active Threats"
-          value={metrics?.activeThreats ?? 0}
-          subtext="Threat vectors identified this session"
-          iconType="alert"
-          tooltipText={METRIC_TOOLTIPS.activeThreats}
+          title="Active Learners"
+          value={activeLearners}
+          subtext="Concurrent operators studying enclaves"
+          iconType="activity"
+          tooltipText={METRIC_TOOLTIPS.activeLearners}
           isDemo={metrics?.isDemoData}
         />
         <StatCard
-          title="Logs Processed"
-          value={metrics?.logsProcessed ?? 0}
-          subtext="Security telemetry events analyzed"
-          iconType="activity"
-          tooltipText={METRIC_TOOLTIPS.logsProcessed}
+          title="Global XP Earned"
+          value={metrics?.globalXp ?? 0}
+          subtext="Aggregated XP gained by training base"
+          iconType="shield"
+          tooltipText={METRIC_TOOLTIPS.globalXp}
+          isDemo={metrics?.isDemoData}
+        />
+        <StatCard
+          title="Certificates Unlocked"
+          value={metrics?.badgesClaimed ?? 0}
+          subtext="Total certification badges unlocked"
+          iconType="award"
+          tooltipText={METRIC_TOOLTIPS.badgesClaimed}
           isDemo={metrics?.isDemoData}
         />
       </div>
+
+      {/* ── Sector Explore Widget ─────────────────────────────────────── */}
+      <SectorExploreWidget />
+
+      {/* ── Global Cyber Attack Map ───────────────────────────────────── */}
+      <Suspense fallback={
+        <div
+          className="rounded-2xl flex items-center justify-center"
+          style={{ height: 520, background: 'var(--db-surface)', border: '1px solid var(--db-border)' }}
+        >
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-10 w-10 rounded-full border-2 border-indigo-400 border-t-transparent animate-spin" />
+            <span className="text-xs font-semibold text-slate-500">Initializing threat map...</span>
+          </div>
+        </div>
+      }>
+        <AttackMap />
+      </Suspense>
 
       {/* ── Progress + Daily Tip row ─────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

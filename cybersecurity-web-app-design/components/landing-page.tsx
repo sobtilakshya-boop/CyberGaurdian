@@ -1,16 +1,17 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import Image from "next/image"
 import { Shield, LockKeyhole, Radar, ScanEye, Activity, Globe, Cpu } from "lucide-react"
 import { motion } from "framer-motion"
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Environment, useTexture, Text } from '@react-three/drei'
+import * as THREE from 'three'
 
-// ── Custom Cyber Targeting Cursor (zero-state, direct DOM, GPU-accelerated) ──
+// ── Minimal Realistic Optical Glitch Cursor ─────────────────────────────────
 function CyberCursor() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const arcRef = useRef<SVGSVGElement>(null)
-  const ringRef = useRef<HTMLDivElement>(null)
-  const dotRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     // ── Inject global cursor:none so it NEVER leaks through buttons/links ──
@@ -18,58 +19,63 @@ function CyberCursor() {
     styleEl.textContent = "*, *::before, *::after { cursor: none !important; }"
     document.head.appendChild(styleEl)
 
-    let angle = 0
     let rafId: number
-    // Track raw values — no React state involved
     let mx = -300, my = -300
     let isHover = false, isClick = false
 
-    const onMove = (e: MouseEvent) => {
-      mx = e.clientX
-      my = e.clientY
+    const onMove = (e: MouseEvent) => { 
+      mx = e.clientX; 
+      my = e.clientY; 
       const el = e.target as HTMLElement
       isHover = !!(el.closest("button") || el.closest("a"))
     }
     const onDown = () => { isClick = true }
     const onUp = () => { isClick = false }
 
-    // Passive listeners — zero scroll jank
     window.addEventListener("mousemove", onMove, { passive: true })
     window.addEventListener("mousedown", onDown, { passive: true })
     window.addEventListener("mouseup", onUp, { passive: true })
 
     const tick = () => {
-      angle += 1.8
-
-      // ── Move container with GPU-composited translate3d ──────────────────
+      // 1) Move outer container (smooth position)
       if (containerRef.current) {
-        containerRef.current.style.transform = `translate3d(${mx - 50}px,${my - 50}px,0)`
+        // Only update if it actually moved significantly to save DOM ops
+        if (Math.abs(mx - Number(containerRef.current.dataset.lastX || 0)) > 0.5 ||
+            Math.abs(my - Number(containerRef.current.dataset.lastY || 0)) > 0.5) {
+          containerRef.current.style.transform = `translate3d(${mx}px,${my}px,0)`
+          containerRef.current.dataset.lastX = mx.toString()
+          containerRef.current.dataset.lastY = my.toString()
+        }
       }
 
-      // ── Spin arc SVG ────────────────────────────────────────────────────
-      if (arcRef.current) {
-        arcRef.current.style.transform = `rotate(${angle}deg)`
-      }
+      // 2) Realistic optical glitch animation
+      if (innerRef.current) {
+        const glitchChance = isHover ? 0.7 : 0.95
+        let gx = 0, gy = 0
+        
+        if (isClick) {
+          // Sharp photographic tear on click
+          gx = (Math.random() - 0.5) * 8
+          gy = (Math.random() - 0.5) * 8
+        } else if (Math.random() > glitchChance) {
+          // Subtle static jitter
+          gx = (Math.random() - 0.5) * 3
+          gy = (Math.random() - 0.5) * 3
+        }
 
-      // ── Expand ring on hover ─────────────────────────────────────────────
-      if (ringRef.current) {
-        const size = isHover ? 52 : 36
-        ringRef.current.style.width = `${size}px`
-        ringRef.current.style.height = `${size}px`
-        ringRef.current.style.marginLeft = `${-size / 2}px`
-        ringRef.current.style.marginTop = `${-size / 2}px`
-        ringRef.current.style.borderColor = isHover
-          ? "rgba(6,182,212,0.9)"
-          : "rgba(6,182,212,0.6)"
-      }
-
-      // ── Pulse dot on click ───────────────────────────────────────────────
-      if (dotRef.current) {
-        const ds = isClick ? 8 : 4
-        dotRef.current.style.width = `${ds}px`
-        dotRef.current.style.height = `${ds}px`
-        dotRef.current.style.marginLeft = `${-ds / 2}px`
-        dotRef.current.style.marginTop = `${-ds / 2}px`
+        const size = isClick ? 10 : (isHover ? 24 : 14)
+        
+        innerRef.current.style.transform = `translate3d(${gx}px, ${gy}px, 0)`
+        innerRef.current.style.width = `${size}px`
+        innerRef.current.style.height = `${size}px`
+        innerRef.current.style.marginLeft = `${-size/2}px`
+        innerRef.current.style.marginTop = `${-size/2}px`
+        
+        if (isClick) {
+            innerRef.current.style.borderRadius = "2px" // Sharpen on click
+        } else {
+            innerRef.current.style.borderRadius = "50%" // Smooth optical lens normally
+        }
       }
 
       rafId = requestAnimationFrame(tick)
@@ -87,253 +93,139 @@ function CyberCursor() {
   }, [])
 
   return (
-    // Fixed 100×100 box anchored at top-left; moved via translate3d
     <div
       ref={containerRef}
       aria-hidden="true"
       style={{
-        position: "fixed",
-        top: 0, left: 0,
-        width: 100, height: 100,
-        pointerEvents: "none",
-        zIndex: 9999,
-        willChange: "transform",          // own compositor layer — zero paint cost
+        position: "fixed", top: 0, left: 0,
+        pointerEvents: "none", zIndex: 9999,
+        willChange: "transform",
         transform: "translate3d(-300px,-300px,0)",
       }}
     >
-      {/* Rotating dual-arc SVG — only transform changes, no layout */}
-      <svg
-        ref={arcRef}
-        width={100} height={100}
+      <div
+        ref={innerRef}
         style={{
           position: "absolute", top: 0, left: 0,
-          transformOrigin: "50px 50px",   // rotate around container center
-          overflow: "visible",
-        }}
-      >
-        <circle cx={50} cy={50} r={27}
-          fill="none" stroke="rgba(6,182,212,0.85)" strokeWidth="1"
-          strokeDasharray="17 52" strokeLinecap="round"
-        />
-        <circle cx={50} cy={50} r={27}
-          fill="none" stroke="rgba(56,189,248,0.5)" strokeWidth="1"
-          strokeDasharray="11 58" strokeDashoffset="34" strokeLinecap="round"
-        />
-      </svg>
-
-      {/* Targeting ring — size updated via direct style in tick() */}
-      <div
-        ref={ringRef}
-        style={{
-          position: "absolute", top: "50%", left: "50%",
-          width: 36, height: 36,
-          marginLeft: -18, marginTop: -18,
+          width: 14, height: 14,
+          marginLeft: -7, marginTop: -7,
           borderRadius: "50%",
-          border: "1px solid rgba(6,182,212,0.6)",
-          boxShadow: "0 0 10px rgba(6,182,212,0.3), inset 0 0 6px rgba(6,182,212,0.08)",
-          transition: "width 0.15s ease, height 0.15s ease, margin 0.15s ease, border-color 0.15s ease",
-        }}
-      />
-
-      {/* 4 crosshair bracket ticks — static, no animation */}
-      {[0, 90, 180, 270].map((deg) => (
-        <div key={deg} style={{
-          position: "absolute", top: "50%", left: "50%",
-          width: 7, height: 1,
-          background: "rgba(6,182,212,0.9)",
-          boxShadow: "0 0 4px rgba(6,182,212,0.7)",
-          transformOrigin: "0 50%",
-          transform: `rotate(${deg}deg) translateX(23px) translateY(-50%)`,
-        }} />
-      ))}
-
-      {/* Center dot — size updated via direct style in tick() */}
-      <div
-        ref={dotRef}
-        style={{
-          position: "absolute", top: "50%", left: "50%",
-          width: 4, height: 4,
-          marginLeft: -2, marginTop: -2,
-          borderRadius: "50%",
-          background: "rgba(6,182,212,1)",
-          boxShadow: "0 0 8px rgba(6,182,212,1), 0 0 16px rgba(6,182,212,0.5)",
-          transition: "width 0.1s ease, height 0.1s ease, margin 0.1s ease",
+          // Realistic frosted glass orb texture
+          background: "rgba(255, 255, 255, 0.65)",
+          backdropFilter: "blur(8px) saturate(150%)",
+          border: "1px solid rgba(255, 255, 255, 0.9)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.15), inset 0 0 8px rgba(255,255,255,0.9)",
+          transition: "width 0.15s ease, height 0.15s ease, margin 0.15s ease, transform 0.05s ease, border-radius 0.15s ease",
         }}
       />
     </div>
   )
 }
 
-// ── 3D Wireframe Globe ───────────────────────────────────────────────────────
-function WireframeGlobe() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+// ── Cyber Hygiene Secure Shield ─────────────────────────────────────────────
+function SecureShield() {
+  const coreRef = useRef<THREE.Mesh>(null!)
+  const shieldRef = useRef<THREE.Mesh>(null!)
+  const orbitRef = useRef<THREE.Group>(null!)
 
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
+  // Load real PBR Normal Map for a hyper-realistic 3D texture on the core
+  const normalMap = useTexture('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/waternormals.jpg')
+  normalMap.wrapS = normalMap.wrapT = THREE.RepeatWrapping
+  normalMap.repeat.set(3, 3)
 
-    const SIZE = 520
-    canvas.width = SIZE
-    canvas.height = SIZE
-    const cx = SIZE / 2
-    const cy = SIZE / 2
-    const RADIUS = 190
-    const FOV = 520
-
-    let rotY = 0
-    let rotX = 0.22  // slight tilt for depth
-    let rafId: number
-
-    // Project a 3D unit-sphere point to 2D canvas coordinates
-    const project = (x: number, y: number, z: number): { px: number; py: number; depth: number } => {
-      // Rotate around X axis (tilt)
-      const cosX = Math.cos(rotX)
-      const sinX = Math.sin(rotX)
-      const y1 = y * cosX - z * sinX
-      const z1 = y * sinX + z * cosX
-
-      // Rotate around Y axis (spin)
-      const cosY = Math.cos(rotY)
-      const sinY = Math.sin(rotY)
-      const x2 = x * cosY + z1 * sinY
-      const z2 = -x * sinY + z1 * cosY
-
-      // Perspective divide
-      const depth = z2 + 2.5
-      const scale = FOV / (FOV + depth * RADIUS)
-      return {
-        px: cx + x2 * RADIUS * scale,
-        py: cy + y1 * RADIUS * scale,
-        depth: depth,
-      }
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime()
+    if (coreRef.current) {
+      coreRef.current.rotation.y = t * 0.2
+      coreRef.current.rotation.x = t * 0.1
+      coreRef.current.position.y = Math.sin(t * 1.5) * 0.1 // Gentle hover
     }
-
-    const LAT_LINES = 9
-    const LON_LINES = 16
-    const STEPS = 96
-
-    const render = () => {
-      ctx.clearRect(0, 0, SIZE, SIZE)
-      rotY += 0.004
-
-      // ── Latitude circles ──────────────────────────────────────────────────
-      for (let li = 1; li < LAT_LINES; li++) {
-        const lat = (li / LAT_LINES) * Math.PI - Math.PI / 2
-        const r = Math.cos(lat)
-        const yy = Math.sin(lat)
-
-        ctx.beginPath()
-        let first = true
-        for (let s = 0; s <= STEPS; s++) {
-          const lon = (s / STEPS) * Math.PI * 2
-          const xx = r * Math.cos(lon)
-          const zz = r * Math.sin(lon)
-          const { px, py, depth } = project(xx, yy, zz)
-          // Front-face: depth > 0 means closer, lighter
-          if (first) { ctx.moveTo(px, py); first = false }
-          else ctx.lineTo(px, py)
-        }
-        ctx.strokeStyle = `rgba(6, 182, 212, 0.14)`
-        ctx.lineWidth = 0.9
-        ctx.stroke()
-      }
-
-      // ── Longitude lines ────────────────────────────────────────────────────
-      for (let li = 0; li < LON_LINES; li++) {
-        const lon = (li / LON_LINES) * Math.PI * 2
-
-        // Segment into front/back with opacity split
-        const frontPts: { px: number; py: number; depth: number }[] = []
-        const backPts: { px: number; py: number; depth: number }[] = []
-
-        for (let s = 0; s <= STEPS; s++) {
-          const lat = (s / STEPS) * Math.PI - Math.PI / 2
-          const r = Math.cos(lat)
-          const yy = Math.sin(lat)
-          const xx = r * Math.cos(lon)
-          const zz = r * Math.sin(lon)
-          const pt = project(xx, yy, zz)
-          if (pt.depth >= 0) frontPts.push(pt)
-          else backPts.push(pt)
-        }
-
-        // Back half (dimmer)
-        if (backPts.length > 1) {
-          ctx.beginPath()
-          backPts.forEach((p, i) => { i === 0 ? ctx.moveTo(p.px, p.py) : ctx.lineTo(p.px, p.py) })
-          ctx.strokeStyle = `rgba(6, 182, 212, 0.05)`
-          ctx.lineWidth = 0.6
-          ctx.stroke()
-        }
-
-        // Front half (brighter)
-        if (frontPts.length > 1) {
-          ctx.beginPath()
-          frontPts.forEach((p, i) => { i === 0 ? ctx.moveTo(p.px, p.py) : ctx.lineTo(p.px, p.py) })
-          ctx.strokeStyle = `rgba(6, 182, 212, 0.28)`
-          ctx.lineWidth = 1.0
-          ctx.stroke()
-        }
-      }
-
-      // ── Equator highlight (brighter) ───────────────────────────────────────
-      ctx.beginPath()
-      let firstEq = true
-      for (let s = 0; s <= STEPS; s++) {
-        const lon = (s / STEPS) * Math.PI * 2
-        const { px, py, depth } = project(Math.cos(lon), 0, Math.sin(lon))
-        if (firstEq) { ctx.moveTo(px, py); firstEq = false } else ctx.lineTo(px, py)
-      }
-      ctx.strokeStyle = `rgba(56, 189, 248, 0.32)`
-      ctx.lineWidth = 1.2
-      ctx.stroke()
-
-      // ── Glowing poles ─────────────────────────────────────────────────────
-      const northPole = project(0, 1, 0)
-      const southPole = project(0, -1, 0)
-      for (const pole of [northPole, southPole]) {
-        const g = ctx.createRadialGradient(pole.px, pole.py, 0, pole.px, pole.py, 12)
-        g.addColorStop(0, "rgba(6,182,212,0.7)")
-        g.addColorStop(1, "rgba(6,182,212,0)")
-        ctx.beginPath()
-        ctx.arc(pole.px, pole.py, 12, 0, Math.PI * 2)
-        ctx.fillStyle = g
-        ctx.fill()
-      }
-
-      // ── Ambient glow halo ─────────────────────────────────────────────────
-      const halo = ctx.createRadialGradient(cx, cy, RADIUS * 0.7, cx, cy, RADIUS * 1.3)
-      halo.addColorStop(0, "rgba(6,182,212,0.0)")
-      halo.addColorStop(0.7, "rgba(6,182,212,0.04)")
-      halo.addColorStop(1, "rgba(6,182,212,0.0)")
-      ctx.beginPath()
-      ctx.arc(cx, cy, RADIUS * 1.3, 0, Math.PI * 2)
-      ctx.fillStyle = halo
-      ctx.fill()
-
-      rafId = requestAnimationFrame(render)
+    if (shieldRef.current) {
+      shieldRef.current.rotation.y = -t * 0.1
+      // Pulse the opacity for a "forcefield" breathing effect
+      ;(shieldRef.current.material as THREE.MeshPhysicalMaterial).opacity = 0.3 + Math.sin(t * 2) * 0.1
     }
+    if (orbitRef.current) {
+      orbitRef.current.rotation.y = t * 0.3
+      orbitRef.current.rotation.z = Math.sin(t * 0.5) * 0.2
+    }
+    // Animate the normal map to make the realistic 3D texture flow
+    normalMap.offset.x -= 0.002
+    normalMap.offset.y -= 0.002
+  })
 
-    render()
-    return () => cancelAnimationFrame(rafId)
-  }, [])
+  // Indicators for encryption/data
+  const encLabels = ["AES-256", "VERIFIED", "ENCRYPTED", "SECURE"]
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none absolute z-[2]"
-      style={{
-        width: "520px",
-        height: "520px",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -56%)",
-        opacity: 0.75,
-        filter: "drop-shadow(0 0 40px rgba(6,182,212,0.18))",
-      }}
-    />
+    <group scale={0.7}> {/* Significantly smaller scale */}
+      {/* Central Clean Data Core with Realistic 3D Texture */}
+      <mesh ref={coreRef}>
+        <sphereGeometry args={[1.1, 64, 64]} />
+        <meshPhysicalMaterial 
+          color="#0f172a"
+          metalness={1}
+          roughness={0.2}
+          normalMap={normalMap}
+          normalScale={new THREE.Vector2(1, 1)}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
+          envMapIntensity={3}
+          emissive="#0ea5e9"
+          emissiveIntensity={0.1}
+        />
+      </mesh>
+
+      {/* Protective Cyber Hygiene Forcefield */}
+      <mesh ref={shieldRef}>
+        <sphereGeometry args={[1.5, 32, 32]} />
+        <meshPhysicalMaterial 
+          color="#38bdf8"
+          transparent
+          opacity={0.3}
+          roughness={0}
+          transmission={0.9} // Glass-like
+          thickness={0.5}
+          clearcoat={1}
+        />
+      </mesh>
+
+      {/* Orbiting Secure Data Packets & Encryption Indicators */}
+      <group ref={orbitRef}>
+        {[0, 1, 2, 3].map((i) => {
+          const angle = (i / 4) * Math.PI * 2;
+          const radius = 2.2;
+          return (
+            <group key={i} position={[Math.cos(angle) * radius, 0, Math.sin(angle) * radius]}>
+              <mesh>
+                <sphereGeometry args={[0.1, 16, 16]} />
+                <meshStandardMaterial 
+                  color="#22c55e" // Green for safe/hygiene
+                  emissive="#22c55e"
+                  emissiveIntensity={0.8}
+                />
+              </mesh>
+              {/* Holographic Data/Encryption Indicator Text */}
+              <Text
+                position={[0, 0.35, 0]}
+                fontSize={0.18}
+                color="#38bdf8"
+                anchorX="center"
+                anchorY="middle"
+                fillOpacity={0.9}
+              >
+                {encLabels[i]}
+              </Text>
+            </group>
+          );
+        })}
+        {/* Protective Ring */}
+        <mesh rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[2.2, 0.02, 16, 64]} />
+          <meshBasicMaterial color="#38bdf8" transparent opacity={0.3} />
+        </mesh>
+      </group>
+    </group>
   )
 }
 
@@ -390,182 +282,13 @@ export function LandingPage({ onAuth }: LandingPageProps) {
     return () => window.removeEventListener("mousemove", handleMouseMove)
   }, [])
 
-  // ── Background canvas: autonomous particles, NO mouse interaction ────────────
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
-    if (!ctx) return
 
-    let animationId: number
-    let width = (canvas.width = window.innerWidth)
-    let height = (canvas.height = window.innerHeight)
-    let time = 0
 
-    const handleResize = () => {
-      if (!canvas) return
-      width = canvas.width = window.innerWidth
-      height = canvas.height = window.innerHeight
-    }
-    window.addEventListener("resize", handleResize)
-
-    interface Node {
-      x: number; y: number
-      radius: number; glowRadius: number
-      vx: number; vy: number
-      angle: number; speed: number
-      color: string; alpha: number
-    }
-
-    const nodeColors = ["6, 182, 212", "56, 189, 248", "59, 130, 246", "99, 102, 241"]
-    const nodeCount = Math.min(65, Math.floor((width * height) / 22000))
-    const nodes: Node[] = []
-
-    for (let i = 0; i < nodeCount; i++) {
-      nodes.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        radius: Math.random() * 1.6 + 0.5,
-        glowRadius: Math.random() * 5 + 3,
-        vx: (Math.random() - 0.5) * 0.22,
-        vy: (Math.random() - 0.5) * 0.22,
-        angle: Math.random() * Math.PI * 2,
-        speed: Math.random() * 0.012 + 0.004,
-        color: nodeColors[i % nodeColors.length],
-        alpha: Math.random() * 0.35 + 0.12,
-      })
-    }
-
-    const rings = [
-      { r: 110, op: 0.016 }, { r: 210, op: 0.011 },
-      { r: 330, op: 0.007 }, { r: 470, op: 0.004 }, { r: 640, op: 0.003 },
-    ]
-
-    const render = () => {
-      time += 1
-      ctx.clearRect(0, 0, width, height)
-
-      const cx = width / 2
-      const cy = height * 0.42
-
-      // Hex dot matrix grid (SEM microscopy aesthetic)
-      const dotSpacing = 36
-      for (let gx = 0; gx < width; gx += dotSpacing) {
-        for (let gy = 0; gy < height; gy += dotSpacing) {
-          const offset = (Math.floor(gy / dotSpacing) % 2) * (dotSpacing / 2)
-          const dotX = gx + offset
-          const distFromCenter = Math.sqrt((dotX - cx) ** 2 + (gy - cy) ** 2)
-          const falloff = Math.max(0, 1 - distFromCenter / (width * 0.72))
-          const pulse = 0.5 + 0.5 * Math.sin(time * 0.007 + distFromCenter * 0.007)
-          ctx.beginPath()
-          ctx.arc(dotX, gy, 0.5, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(6, 182, 212, ${0.022 * falloff * pulse})`
-          ctx.fill()
-        }
-      }
-
-      // Scanning grid lines
-      const gridSize = 72
-      for (let x = 0; x < width; x += gridSize) {
-        ctx.strokeStyle = `rgba(6, 182, 212, ${0.012 * (1 - Math.abs(x - cx) / width)})`
-        ctx.lineWidth = 0.4
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke()
-      }
-      for (let y = 0; y < height; y += gridSize) {
-        ctx.strokeStyle = `rgba(56, 189, 248, ${0.009 * (1 - Math.abs(y - cy) / height)})`
-        ctx.lineWidth = 0.4
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke()
-      }
-
-      // SEM pulse rings
-      for (const ring of rings) {
-        const pulse = 0.55 + 0.45 * Math.sin(time * 0.005 + ring.r * 0.01)
-        ctx.beginPath()
-        ctx.arc(cx, cy, ring.r, 0, Math.PI * 2)
-        ctx.strokeStyle = `rgba(6, 182, 212, ${ring.op * pulse})`
-        ctx.lineWidth = 0.4
-        ctx.stroke()
-      }
-
-      // Radar sweep arm (purely autonomous)
-      const sweepAngle = (time * 0.0025) % (Math.PI * 2)
-      for (let arc = 0; arc < 5; arc++) {
-        const a = sweepAngle - arc * 0.11
-        ctx.beginPath()
-        ctx.moveTo(cx, cy)
-        ctx.arc(cx, cy, 460, a, a + 0.11)
-        ctx.closePath()
-        ctx.fillStyle = `rgba(6, 182, 212, ${Math.max(0, 0.018 - arc * 0.003)})`
-        ctx.fill()
-      }
-
-      // Autonomous particles — NO mouse interaction
-      for (let i = 0; i < nodes.length; i++) {
-        const p = nodes[i]
-        p.angle += p.speed
-        p.x += p.vx + Math.sin(p.angle) * 0.1
-        p.y += p.vy + Math.cos(p.angle) * 0.1
-        if (p.x < 0 || p.x > width) p.vx *= -1
-        if (p.y < 0 || p.y > height) p.vy *= -1
-
-        const alphaPulse = p.alpha * (0.65 + 0.35 * Math.sin(time * 0.018 + i))
-
-        // Bloom glow halo
-        const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.glowRadius * 2.5)
-        glow.addColorStop(0, `rgba(${p.color}, ${alphaPulse * 0.55})`)
-        glow.addColorStop(0.45, `rgba(${p.color}, ${alphaPulse * 0.12})`)
-        glow.addColorStop(1, `rgba(${p.color}, 0)`)
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.glowRadius * 2.5, 0, Math.PI * 2)
-        ctx.fillStyle = glow
-        ctx.fill()
-
-        // Core dot
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(${p.color}, ${alphaPulse})`
-        ctx.fill()
-
-        // Connection lines (autonomous)
-        for (let j = i + 1; j < nodes.length; j++) {
-          const q = nodes[j]
-          const dx = p.x - q.x
-          const dy = p.y - q.y
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < 155) {
-            const alpha = (1 - dist / 155) * 0.065
-            const lineGrad = ctx.createLinearGradient(p.x, p.y, q.x, q.y)
-            lineGrad.addColorStop(0, `rgba(${p.color}, ${alpha})`)
-            lineGrad.addColorStop(1, `rgba(${q.color}, ${alpha * 0.4})`)
-            ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y)
-            ctx.strokeStyle = lineGrad; ctx.lineWidth = 0.55; ctx.stroke()
-          }
-        }
-      }
-
-      // Center focal bloom
-      const focalGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 300)
-      focalGlow.addColorStop(0, `rgba(6, 182, 212, ${0.035 + 0.012 * Math.sin(time * 0.008)})`)
-      focalGlow.addColorStop(0.5, "rgba(56, 189, 248, 0.012)")
-      focalGlow.addColorStop(1, "rgba(6, 182, 212, 0)")
-      ctx.beginPath(); ctx.arc(cx, cy, 300, 0, Math.PI * 2)
-      ctx.fillStyle = focalGlow; ctx.fill()
-
-      animationId = requestAnimationFrame(render)
-    }
-
-    render()
-    return () => {
-      window.removeEventListener("resize", handleResize)
-      cancelAnimationFrame(animationId)
-    }
-  }, []) // ← empty deps: NO mouse interaction at all
-
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     show: { opacity: 1, transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
   }
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 90, damping: 18 } },
   }
@@ -576,17 +299,25 @@ export function LandingPage({ onAuth }: LandingPageProps) {
       <CyberCursor />
 
       <div
-        className="relative min-h-screen flex flex-col overflow-hidden text-slate-100"
+        className="relative min-h-screen flex flex-col overflow-hidden text-slate-900"
         style={{
-          background: "radial-gradient(ellipse 120% 80% at 50% 0%, #020d1a 0%, #000d1f 35%, #010810 60%, #000508 100%)",
+          background: "linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%)",
           cursor: "none",
         }}
       >
-        {/* ── BG 0: Autonomous canvas particles ─────────────────────────────── */}
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
 
-        {/* ── BG 1: 3D Rotating wireframe globe ─────────────────────────────── */}
-        <WireframeGlobe />
+
+        {/* ── BG 1: Immersive 3D Secure Shield ──────────────────────────── */}
+        <div className="absolute inset-0 pointer-events-none z-[1] flex items-center justify-center opacity-80" style={{ transform: "translateY(-5%)" }}>
+          <Canvas camera={{ position: [0, 0, 5] }} gl={{ alpha: true }} dpr={[1, 1.5]} performance={{ min: 0.5 }}>
+            <ambientLight intensity={1.5} />
+            <directionalLight position={[10, 10, 10]} intensity={2.5} />
+            <Environment preset="city" />
+            <Suspense fallback={null}>
+              <SecureShield />
+            </Suspense>
+          </Canvas>
+        </div>
 
         {/* ── BG 2: Film grain noise ─────────────────────────────────────────── */}
         <div
@@ -670,7 +401,7 @@ export function LandingPage({ onAuth }: LandingPageProps) {
 
         {/* ── BG 6: DoF edge vignette ──────────────────────────────────────── */}
         <div aria-hidden="true" className="absolute inset-0 pointer-events-none z-[6]"
-          style={{ background: "radial-gradient(ellipse 100% 100% at 50% 50%, transparent 28%, rgba(0,5,10,0.52) 72%, rgba(0,2,6,0.86) 100%)" }}
+          style={{ background: "radial-gradient(ellipse 100% 100% at 50% 50%, transparent 28%, rgba(255,255,255,0.52) 72%, rgba(255,255,255,0.86) 100%)" }}
         />
 
         {/* ── BG 7: Text protection vignette ───────────────────────────────── */}
@@ -679,14 +410,14 @@ export function LandingPage({ onAuth }: LandingPageProps) {
             width: "900px", height: "680px",
             top: "50%", left: "50%",
             transform: "translate(-50%, -54%)",
-            background: "radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,3,8,0.68) 0%, rgba(0,3,8,0.3) 55%, transparent 80%)",
+            background: "radial-gradient(ellipse 70% 70% at 50% 50%, rgba(255,255,255,0.68) 0%, rgba(255,255,255,0.3) 55%, transparent 80%)",
           }}
         />
 
         {/* ── HEADER z-20 ───────────────────────────────────────────────────── */}
         <header className="relative w-full z-20 flex items-center justify-end px-4 py-4 sm:px-8">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-lg font-semibold tracking-tight text-foreground">CyberPeace</span>
+            <span className="font-sans text-xl sm:text-2xl font-black tracking-tight text-slate-900 drop-shadow-sm">CyberPeace</span>
             <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-primary/40 bg-white p-1">
               <Image src="/images/cyberpeace-logo.webp" alt="CyberPeace logo" width={44} height={44} className="h-full w-full object-contain" priority />
             </div>
@@ -710,29 +441,29 @@ export function LandingPage({ onAuth }: LandingPageProps) {
               style={{ transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)", transformStyle: "preserve-3d", willChange: "transform" }}
               className="relative mb-10 flex h-36 w-36 items-center justify-center transition-transform duration-300 ease-out cursor-pointer group"
             >
-              <div className="absolute inset-0 rounded-full bg-cyan-500/10 blur-2xl opacity-60 group-hover:opacity-85 transition-opacity duration-300" />
-              <div className="absolute inset-0 animate-ping rounded-full bg-cyan-500/10" style={{ animationDuration: "3s" }} />
-              <div className="absolute inset-0 animate-ping rounded-full bg-cyan-500/5" style={{ animationDuration: "2s", animationDelay: "1s" }} />
-              <div className="absolute inset-1 rounded-full border border-cyan-500/20 border-dashed animate-spin" style={{ animationDuration: "15s" }} />
-              <div className="absolute inset-4 rounded-full border border-cyan-400/30 group-hover:border-cyan-400/60 transition-colors duration-300" />
-              <div className="absolute inset-6 rounded-full border border-blue-500/20 border-dotted animate-spin" style={{ animationDuration: "10s", animationDirection: "reverse" }} />
-              <Radar className="absolute h-32 w-32 animate-spin text-cyan-400/40 drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]" style={{ animationDuration: "5s" }} aria-hidden="true" />
+              <div className="absolute inset-0 rounded-full bg-slate-900/10 blur-2xl opacity-60 group-hover:opacity-85 transition-opacity duration-300" />
+              <div className="absolute inset-0 animate-ping rounded-full bg-slate-900/10" style={{ animationDuration: "3s" }} />
+              <div className="absolute inset-0 animate-ping rounded-full bg-slate-900/5" style={{ animationDuration: "2s", animationDelay: "1s" }} />
+              <div className="absolute inset-1 rounded-full border border-slate-900/40 border-dashed animate-spin" style={{ animationDuration: "15s" }} />
+              <div className="absolute inset-4 rounded-full border border-slate-800/50 group-hover:border-slate-800/80 transition-colors duration-300" />
+              <div className="absolute inset-6 rounded-full border border-blue-900/40 border-dotted animate-spin" style={{ animationDuration: "10s", animationDirection: "reverse" }} />
+              <Radar className="absolute h-32 w-32 animate-spin text-slate-800/60 drop-shadow-sm" style={{ animationDuration: "5s" }} aria-hidden="true" />
               <div className="relative flex items-center justify-center" style={{ transform: "translateZ(25px)" }}>
-                <Shield className="h-16 w-16 text-cyan-400 animate-pulse drop-shadow-[0_0_15px_rgba(6,182,212,0.75)]" strokeWidth={1.5} aria-hidden="true" />
+                <Shield className="h-16 w-16 text-slate-900 drop-shadow-md" strokeWidth={1.5} aria-hidden="true" />
               </div>
             </motion.div>
 
             {/* Title */}
             <motion.h1 variants={itemVariants}
-              className="font-mono text-5xl sm:text-6xl md:text-7xl font-extrabold uppercase tracking-tight text-white leading-none"
+              className="font-mono text-5xl sm:text-6xl md:text-7xl font-extrabold uppercase tracking-tight text-slate-900 leading-none"
             >
               <span>CYBER</span>
-              <span className="bg-gradient-to-r from-cyan-400 via-cyan-300 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(6,182,212,0.3)] pl-2">GUARDIAN</span>
+              <span className="bg-gradient-to-r from-cyan-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(6,182,212,0.2)] pl-2">GUARDIAN</span>
             </motion.h1>
 
             {/* Subtitle */}
             <motion.p variants={itemVariants}
-              className="mt-6 max-w-xl text-slate-400 font-mono text-xs sm:text-sm tracking-wide leading-relaxed text-pretty"
+              className="mt-6 max-w-xl text-slate-600 font-mono text-xs sm:text-sm tracking-wide leading-relaxed text-pretty font-medium"
             >
               Next-generation cyber hygiene and digital defense. Stay protected, stay vigilant, stay at peace.
             </motion.p>
@@ -758,31 +489,31 @@ export function LandingPage({ onAuth }: LandingPageProps) {
         </main>
 
         {/* ── ABOUT US z-10 ─────────────────────────────────────────────────── */}
-        <section className="relative px-6 py-20 z-10 bg-gradient-to-b from-transparent to-slate-950">
+        <section className="relative px-6 py-20 z-10 bg-gradient-to-b from-transparent to-slate-100">
           <motion.div
             ref={aboutCardRef}
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ type: "spring", stiffness: 70, damping: 15 }}
-            className="mx-auto max-w-3xl relative rounded-2xl p-[1px] shadow-[0_0_50px_rgba(6,182,212,0.05)] hover:shadow-[0_0_60px_rgba(6,182,212,0.12)] transition-all duration-300 ease-out"
+            className="mx-auto max-w-3xl relative rounded-2xl p-[1px] shadow-[0_10px_50px_rgba(6,182,212,0.1)] hover:shadow-[0_10px_60px_rgba(6,182,212,0.15)] transition-all duration-300 ease-out"
             style={{
               transform: "perspective(1000px) rotateX(0deg) rotateY(0deg)",
               transformStyle: "preserve-3d",
-              background: "linear-gradient(135deg, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0.05) 50%, rgba(6,182,212,0.2) 100%)",
+              background: "linear-gradient(135deg, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0.1) 50%, rgba(6,182,212,0.2) 100%)",
               willChange: "transform"
             }}
           >
-            <div className="rounded-2xl bg-slate-950/80 backdrop-blur-3xl p-8 sm:p-12 border border-slate-900/80 flex flex-col items-center text-center gap-6" style={{ transform: "translateZ(25px)" }}>
-              <div className="flex items-center gap-2 text-cyan-400 font-mono text-[10px] tracking-[0.3em] uppercase">
-                <Globe className="h-3.5 w-3.5 text-cyan-500/80" />
+            <div className="rounded-2xl bg-white/80 backdrop-blur-3xl p-8 sm:p-12 border border-slate-200/80 flex flex-col items-center text-center gap-6 shadow-inner" style={{ transform: "translateZ(25px)" }}>
+              <div className="flex items-center gap-2 text-cyan-600 font-mono text-[10px] tracking-[0.3em] uppercase font-bold">
+                <Globe className="h-3.5 w-3.5 text-cyan-500" />
                 <span>[ Platform Mission Overview ]</span>
               </div>
-              <h2 className="font-mono text-2xl sm:text-3xl font-extrabold uppercase tracking-widest text-white">
-                <span className="text-cyan-400">{"// "}</span>About Us
+              <h2 className="font-mono text-2xl sm:text-3xl font-extrabold uppercase tracking-widest text-slate-900">
+                <span className="text-cyan-500">{"// "}</span>About Us
               </h2>
               <div className="h-px w-28 bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-              <p className="leading-relaxed text-slate-400 font-mono text-xs sm:text-sm tracking-wide text-pretty mt-2">
+              <p className="leading-relaxed text-slate-600 font-mono text-xs sm:text-sm tracking-wide text-pretty mt-2 font-medium">
                 CyberPeace Foundation endeavors to make the internet a more secure, stable, trustworthy and inclusive place
                 for all netizens across the globe. As a non-partisan collective, we unite expertise, experiences, capacity
                 and intent across a broad spectrum of institutions, disciplines and cultures in order to combat the common
@@ -793,7 +524,7 @@ export function LandingPage({ onAuth }: LandingPageProps) {
         </section>
 
         {/* ── FOOTER z-10 ───────────────────────────────────────────────────── */}
-        <footer className="relative z-10 border-t border-slate-900 bg-slate-950/80 px-6 py-8 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[10px] text-slate-500 uppercase tracking-widest sm:px-12">
+        <footer className="relative z-10 border-t border-slate-300 bg-white/80 px-6 py-8 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[10px] text-slate-500 uppercase tracking-widest sm:px-12">
           <div className="flex items-center gap-2">
             <Cpu className="h-3 w-3 text-cyan-500/60" />
             <span>CYBERPEACE &middot; CYBERGUARDIAN CORE</span>

@@ -13,6 +13,7 @@ export interface MockUser {
   is_verified: boolean
   last_login?: string
   login_count?: number
+  progress_data?: any
 }
 
 // Check if actual Supabase URL/key has been filled in

@@ -137,7 +137,7 @@ function StatCard({
 }: {
   label: string
   value: number
-  icon: React.ElementType
+  icon: any
   color: string
 }) {
   return (

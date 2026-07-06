@@ -14,6 +14,7 @@ import {
   Award,
   User,
   Settings,
+  Building,
   LogOut,
   Loader,
   ChevronDown,
@@ -45,6 +46,7 @@ const navGroups = [
     items: [
       { name: 'My Learning', href: '/dashboard/course', icon: GraduationCap },
       { name: 'Cyber Hygiene', href: '/dashboard/hygiene', icon: Shield },
+      { name: 'Explore by Sector', href: '/dashboard/sectors', icon: Building },
       { name: 'News & Awareness', href: '/dashboard/news', icon: Newspaper },
     ],
   },
@@ -92,9 +94,7 @@ export default function Sidebar({ user }: SidebarProps) {
       style={{
         background: 'var(--db-surface)',
         borderRight: '1px solid var(--db-border)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: 'var(--db-shadow-md)',
+        boxShadow: 'var(--db-shadow-sm)',
       }}
     >
       {/* Brand Header */}
@@ -156,7 +156,7 @@ export default function Sidebar({ user }: SidebarProps) {
         {navGroups.map((group) => (
           <div key={group.label}>
             <p
-              className="px-3 mb-1.5 text-[9px] font-mono font-bold uppercase tracking-[0.2em]"
+              className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-wider"
               style={{ color: 'var(--db-text-muted)' }}
             >
               {group.label}
@@ -179,7 +179,7 @@ export default function Sidebar({ user }: SidebarProps) {
                       <motion.div
                         layoutId="sidebarActive"
                         className="absolute inset-0 rounded-xl"
-                        style={{ background: 'var(--db-accent-light)', border: '1px solid var(--db-border-strong)' }}
+                        style={{ background: 'var(--db-accent-light)' }}
                         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                       />
                     )}

@@ -4,13 +4,14 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Shield, Loader, CheckCircle2, XCircle, RefreshCw, ChevronLeft } from "lucide-react"
 
-// ─── Masked phone display helper ──────────────────────────────────────────────
-function maskPhone(phone: string): string {
-  if (!phone || phone.length < 5) return "+XXXXX-XXXXX"
-  const clean = phone.replace(/\D/g, "")
-  const visible = clean.slice(-3)
-  const masked = "X".repeat(Math.max(0, clean.length - 3))
-  return `+${masked}-XX${visible}`
+// ─── Masked email display helper ──────────────────────────────────────────────
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return "X***@XXXXX.com"
+  const [localPart, domain] = email.split('@')
+  const maskedLocal = localPart.length > 2 
+    ? `${localPart.slice(0, 2)}***${localPart.slice(-1)}` 
+    : `${localPart.slice(0, 1)}***`
+  return `${maskedLocal}@${domain}`
 }
 
 // ─── OTP Verification Page ────────────────────────────────────────────────────
@@ -24,11 +25,13 @@ export default function VerifyPage() {
   const [resendLoading, setResendLoading] = useState(false)
   const inputRefs = useRef<(HTMLInputElement | null)[]>(Array(6).fill(null))
 
-  // Phone stored in sessionStorage by the auth page
-  const [maskedPhone, setMaskedPhone] = useState("+XXXXX-XXXXX")
+  // Email stored in sessionStorage by the auth page
+  const [maskedEmail, setMaskedEmail] = useState("X***@XXXXX.com")
+  const [isBypass, setIsBypass] = useState(false)
   useEffect(() => {
-    const phone = sessionStorage.getItem("cg_pending_phone") ?? ""
-    setMaskedPhone(maskPhone(phone))
+    const email = sessionStorage.getItem("cg_pending_email") ?? ""
+    setMaskedEmail(maskEmail(email))
+    setIsBypass(sessionStorage.getItem("cg_bypass") === "true")
   }, [])
 
   // ─── 60s countdown timer ────────────────────────────────────────────────────
@@ -257,9 +260,18 @@ export default function VerifyPage() {
               </h1>
               <p className="mt-2 text-sm text-slate-400 font-mono">
                 Code sent to{" "}
-                <span className="text-cyan-400 font-semibold">{maskedPhone}</span>
+                <span className="text-cyan-400 font-semibold">{maskedEmail}</span>
               </p>
             </div>
+
+            {isBypass && (
+              <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-center">
+                <p className="text-sm font-mono text-amber-400">Sandbox Mode Active</p>
+                <p className="text-xs font-mono text-amber-200/70 mt-1">
+                  Service constraints active. Enter code <span className="font-bold text-white tracking-widest bg-amber-500/20 px-2 py-0.5 rounded">123456</span> to verify.
+                </p>
+              </div>
+            )}
 
             {/* OTP Input Grid */}
             <div className="flex justify-center gap-3 mb-6" onPaste={handlePaste}>
@@ -397,15 +409,7 @@ export default function VerifyPage() {
               )}
             </div>
 
-            {/* Demo Mode / Sandbox Helper */}
-            <div className="mt-6 border-t border-slate-800 pt-4 text-center">
-              <span className="font-mono text-[9px] text-slate-500 uppercase tracking-widest block">
-                Sandbox Environment Notice
-              </span>
-              <p className="font-mono text-[10px] text-cyan-400/80 mt-1.5 leading-normal">
-                If Twilio operates in trial mode, enter code <strong className="text-cyan-400 font-bold underline">123456</strong> to bypass.
-              </p>
-            </div>
+
           </div>
         </div>
       </div>

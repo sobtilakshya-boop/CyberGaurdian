@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import twilio from 'twilio'
 import { parse, serialize } from 'cookie'
 import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase'
@@ -21,6 +20,8 @@ interface RegistrationIntent {
   phone: string
   passwordHash: string
   issuedAt: number
+  attempts: number
+  bypassOtp?: boolean
 }
 
 // ─── POST /api/auth/verify-otp ───────────────────────────────────────────────
@@ -70,82 +71,80 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check Twilio credentials — also reject placeholder values
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID
+    const currentAttempts = intent.attempts || 0
 
-    const isPlaceholder = (v?: string) =>
-      !v || v.includes('your_') || v.includes('_here') || v.trim() === ''
-
-    if (isPlaceholder(accountSid) || isPlaceholder(authToken) || isPlaceholder(serviceSid)) {
-      console.error('[verify-otp] Twilio credentials are missing or still set to placeholder values')
-      return NextResponse.json(
-        { success: false, error: 'Verification service is not configured. Please contact support.' },
-        { status: 503 }
+    // Lockout check
+    if (currentAttempts >= 3) {
+      const response = NextResponse.json(
+        { success: false, error: 'Too many failed attempts. Registration session locked. Please restart.' },
+        { status: 429 }
       )
+      response.cookies.delete('registration_intent')
+      return response
     }
 
-    // Verify OTP with Twilio (with fallback for trial bypass)
+    // Helper for failed attempt to update cookie & delay
+    const handleFailedAttempt = async (errorMsg: string, status: number = 400) => {
+      await new Promise((r) => setTimeout(r, 1000)) // 1-second artificial delay
+      const nextAttempts = currentAttempts + 1
+
+      if (nextAttempts >= 3) {
+        const response = NextResponse.json(
+          { success: false, error: 'Too many failed attempts. Registration session locked.' },
+          { status: 429 }
+        )
+        response.cookies.delete('registration_intent')
+        return response
+      }
+
+      const updatedPayload = Buffer.from(
+        JSON.stringify({ ...intent, attempts: nextAttempts })
+      ).toString('base64')
+
+      const response = NextResponse.json({ success: false, error: errorMsg }, { status })
+      response.cookies.set('registration_intent', updatedPayload, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 60 * 15,
+      })
+      return response
+    }
+
+    // Verify OTP with Email Service
     let verificationStatus: string = 'pending'
 
-    const hasBypassHeader = (intent as any).bypassOtp === true || !isSupabaseConfigured()
-    if (hasBypassHeader && otp === '123456') {
-      console.log('[verify-otp] Bypass code 123456 matched. Auto-approving registration.')
+    if (intent.bypassOtp && otp === '123456') {
       verificationStatus = 'approved'
     } else {
-      const client = twilio(accountSid, authToken)
       try {
-        const check = await client.verify.v2
-          .services(serviceSid!)
-          .verificationChecks.create({ to: intent.phone, code: otp })
-        verificationStatus = check.status
-      } catch (twilioError: unknown) {
-        const err = twilioError as { code?: number; message?: string; status?: number; moreInfo?: string }
-        console.error('[verify-otp] Twilio error:', err.message)
+        const response = await fetch('https://otp-service-beta.vercel.app/api/otp/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: intent.email,
+            otp: otp
+          })
+        })
         
-        if (otp === '123456') {
-          console.warn('[verify-otp] Twilio verify failed but user entered bypass code 123456. Approving.')
+        const data = await response.json()
+        
+        if (response.ok && data.success) {
           verificationStatus = 'approved'
         } else {
-          if (err.code === 20003) {
-            return NextResponse.json(
-              { success: false, error: 'Verification service authentication failed. Please contact support.' },
-              { status: 503 }
-            )
-          }
-          if (err.code === 20429 || err.status === 429) {
-            return NextResponse.json(
-              { success: false, error: 'Too many verification attempts. Please wait and try again.' },
-              { status: 429 }
-            )
-          }
-          if (err.code === 60202) {
-            return NextResponse.json(
-              { success: false, error: 'Maximum OTP check attempts exceeded. Please request a new OTP.' },
-              { status: 400 }
-            )
-          }
-          if (err.code === 20404) {
-            return NextResponse.json(
-              { success: false, error: 'Verification service is misconfigured. Please contact support.' },
-              { status: 503 }
-            )
-          }
-
-          return NextResponse.json(
-            { success: false, error: 'Verification failed. Please try again.' },
-            { status: 502 }
-          )
+          return handleFailedAttempt(data.message || 'Invalid or expired OTP', 400)
         }
+      } catch (error: unknown) {
+        console.error('[verify-otp] Email verification check failed:', error)
+        return handleFailedAttempt('Verification service error. Please try again later.', 500)
       }
     }
 
     if (verificationStatus !== 'approved') {
-      return NextResponse.json(
-        { success: false, error: 'Incorrect OTP. Please check the code and try again.' },
-        { status: 400 }
-      )
+      return handleFailedAttempt('Incorrect OTP. Please check the code and try again.', 400)
     }
 
     let userId: string
@@ -232,19 +231,19 @@ export async function POST(request: NextRequest) {
       phone: intent.phone,
     })
 
-    // Clear registration cookie + set session cookie
-    const cookieStore = await cookies()
-    cookieStore.delete('registration_intent')
-    cookieStore.set(
-      sessionCookieOptions.name,
-      sessionToken,
-      sessionCookieOptions.options
-    )
-
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: true, message: 'Account verified and created successfully.' },
       { status: 201 }
     )
+
+    response.cookies.delete('registration_intent')
+    response.cookies.set(
+      sessionCookieOptions.name,
+      sessionToken,
+      { ...sessionCookieOptions.options, maxAge: 60 * 60 * 24 * 30 }
+    )
+
+    return response
   } catch (error) {
     console.error('[verify-otp] Unexpected error:', error)
     return NextResponse.json(

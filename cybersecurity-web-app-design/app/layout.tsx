@@ -1,13 +1,10 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Space_Grotesk, Outfit } from 'next/font/google'
 import './globals.css'
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-})
+const fontSans = Outfit({ variable: '--font-sans', subsets: ['latin'] })
+const fontHeading = Space_Grotesk({ variable: '--font-heading', subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'CyberGuardian | CyberPeace',
@@ -46,9 +43,25 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} bg-background`}
+      className={`${fontSans.variable} ${fontHeading.variable} bg-background`}
     >
-      <body className="font-sans antialiased">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const accent = localStorage.getItem('db-accent-color')
+                if (accent) {
+                  document.documentElement.style.setProperty('--db-accent', accent)
+                  document.documentElement.style.setProperty('--db-accent-light', accent + '14')
+                  document.documentElement.style.setProperty('--db-accent-mid', accent + '26')
+                }
+              } catch (_) {}
+            `
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased bg-slate-50 text-slate-900">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

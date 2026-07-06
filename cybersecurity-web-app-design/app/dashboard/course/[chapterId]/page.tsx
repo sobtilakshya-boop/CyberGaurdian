@@ -23,7 +23,7 @@ type TabId = 'guide' | 'videos' | 'comics' | 'activities' | 'puzzles' | 'assessm
 interface TabConfig {
   id: TabId
   label: string
-  icon: React.ElementType
+  icon: any
   gatedBy?: (cp: ReturnType<typeof useProgress>['getChapterProgress'] extends (...args: any[]) => infer R ? R : never) => boolean
 }
 

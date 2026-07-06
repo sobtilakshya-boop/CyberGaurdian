@@ -17,6 +17,7 @@ import {
   XCircle, 
   LockKeyhole, 
   ChevronRight,
+  ChevronLeft,
   Terminal,
   Activity,
   Cpu
@@ -29,61 +30,7 @@ interface FieldErrors {
   _form?: string
 }
 
-// ─── Interactive Realistic 3D Globe Component ─────────────────────────────────
-function LoginGlobe() {
-  const globeRef = useRef<THREE.Mesh>(null!)
-  const cloudsRef = useRef<THREE.Mesh>(null!)
-  
-  // Load actual detailed Earth textures (Blue Marble and elevation Bump Map)
-  const [earthTexture, bumpMap] = useTexture([
-    'https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',
-    'https://unpkg.com/three-globe/example/img/earth-topology.png'
-  ])
 
-  useFrame((state) => {
-    // Continuous rotation
-    globeRef.current.rotation.y = state.clock.elapsedTime * 0.05
-    cloudsRef.current.rotation.y = state.clock.elapsedTime * 0.065
-  })
-
-  return (
-    <group scale={1.85}>
-      {/* Earth Mesh */}
-      <mesh ref={globeRef}>
-        <sphereGeometry args={[0.8, 36, 36]} />
-        <meshStandardMaterial
-          map={earthTexture}
-          bumpMap={bumpMap}
-          bumpScale={0.03}
-          roughness={0.4}
-          metalness={0.12}
-        />
-      </mesh>
-
-      {/* Grid Wireframe halo shell for security telemetry look */}
-      <mesh>
-        <sphereGeometry args={[0.806, 24, 24]} />
-        <meshBasicMaterial
-          color="#06b6d4"
-          wireframe
-          transparent
-          opacity={0.08}
-        />
-      </mesh>
-
-      {/* Atmosphere outer glow */}
-      <mesh ref={cloudsRef}>
-        <sphereGeometry args={[0.815, 32, 32]} />
-        <meshBasicMaterial
-          color="#06b6d4"
-          transparent
-          opacity={0.06}
-          side={THREE.BackSide}
-        />
-      </mesh>
-    </group>
-  )
-}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -149,7 +96,8 @@ export default function LoginPage() {
       radius: number
     }
 
-    const count = 40
+    // Optimized: Reduced particle count from 40 to 20 to heavily reduce O(N^2) distance calculations
+    const count = 20
     const particles: Particle[] = Array.from({ length: count }, () => ({
       x: Math.random() * width,
       y: Math.random() * height,
@@ -216,7 +164,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, rememberMe }),
       })
       const data = await res.json()
       if (data.success) {
@@ -234,7 +182,7 @@ export default function LoginPage() {
   }
 
   // Animation variants
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     show: {
       opacity: 1,
@@ -242,7 +190,7 @@ export default function LoginPage() {
     }
   }
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 15 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 100 } }
   }
@@ -255,16 +203,22 @@ export default function LoginPage() {
       {/* Light grid Canvas backdrop */}
       <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0" />
       
-      {/* Split grid for Login Form Card + 3D Earth Globe */}
-      <div className="relative w-full max-w-6xl z-10 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      {/* Centered Login Form Card */}
+      <div className="relative w-full max-w-lg z-10 flex flex-col items-center">
         
-        {/* Left Column: Glassmorphic light login form */}
         <motion.div 
           variants={containerVariants}
           initial="hidden"
           animate="show"
-          className="lg:col-span-6 flex flex-col items-center lg:items-start"
+          className="w-full flex flex-col items-center"
         >
+          {/* Back to Home Button */}
+          <motion.div variants={itemVariants} className="w-full mb-4 pl-2">
+            <Link href="/" className="inline-flex items-center gap-1 text-xs font-mono font-bold tracking-widest uppercase text-slate-500 hover:text-cyan-600 transition-colors">
+              <ChevronLeft className="h-4 w-4" /> Back to Gateway
+            </Link>
+          </motion.div>
+
           {/* Online Gateway Tag */}
           <motion.div 
             variants={itemVariants}
@@ -480,33 +434,6 @@ export default function LoginPage() {
             </div>
           </motion.div>
         </motion.div>
-
-        {/* Right Column: Immersive interactive 3D Globe */}
-        <div className="lg:col-span-6 h-[400px] lg:h-[500px] w-full flex items-center justify-center relative z-10 cursor-grab active:cursor-grabbing">
-          {mounted && (
-            <Canvas
-              camera={{ position: [0, 0, 2.0], fov: 45 }}
-              gl={{ antialias: true, alpha: true }}
-              style={{ background: 'transparent' }}
-            >
-              <ambientLight intensity={1.5} />
-              <directionalLight position={[5, 4, 5]} intensity={2.6} />
-              <directionalLight position={[-5, -3, 4]} intensity={1.3} color="#06b6d4" />
-              
-              <Suspense fallback={null}>
-                <LoginGlobe />
-              </Suspense>
-
-              <OrbitControls
-                enableZoom={false}
-                enablePan={false}
-                autoRotate={true}
-                autoRotateSpeed={0.6}
-              />
-            </Canvas>
-          )}
-        </div>
-
       </div>
     </main>
   )

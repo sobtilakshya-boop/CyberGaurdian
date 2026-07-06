@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShieldCheck, Users, AlertOctagon, Activity, Info, FlaskConical } from 'lucide-react'
+import { ShieldCheck, Users, AlertOctagon, Activity, Info, FlaskConical, Award } from 'lucide-react'
 
 interface StatCardProps {
   title: string
   value: number
   suffix?: string
   subtext: string
-  iconType: 'shield' | 'users' | 'alert' | 'activity'
+  iconType: 'shield' | 'users' | 'alert' | 'activity' | 'award'
   tooltipText?: string
   isDemo?: boolean
   accentColor?: string
@@ -20,13 +20,15 @@ const iconMap = {
   users: Users,
   alert: AlertOctagon,
   activity: Activity,
+  award: Award,
 }
 
 const colorMap = {
   shield: { accent: 'var(--db-accent)', bg: 'var(--db-accent-light)', border: 'var(--db-border-strong)' },
   users:  { accent: '#8B5CF6', bg: 'rgba(139,92,246,0.08)', border: 'rgba(139,92,246,0.2)' },
-  alert:  { accent: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)' },
+  alert:  { accent: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
   activity: { accent: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
+  award:  { accent: '#10B981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)' },
 }
 
 export default function StatCard({
@@ -64,19 +66,12 @@ export default function StatCard({
       transition={{ duration: 0.4 }}
       className="relative overflow-visible rounded-2xl p-5"
       style={{
-        background: 'rgba(255,255,255,0.90)',
+        background: 'var(--db-surface)',
         border: '1px solid var(--db-border)',
-        boxShadow: 'var(--db-shadow-md)',
-        backdropFilter: 'blur(12px)',
+        boxShadow: 'var(--db-shadow-sm)',
         zIndex: showTooltip ? 50 : 1,
       }}
     >
-      {/* Subtle accent tint corner */}
-      <div
-        className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl"
-        style={{ background: colors.bg, opacity: 0.6 }}
-      />
-
       {/* Header row */}
       <div className="flex items-start justify-between gap-3 mb-4 relative">
         <div className="flex items-center gap-2">

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import twilio from 'twilio'
 import { serialize } from 'cookie'
 import bcrypt from 'bcryptjs'
 
@@ -17,7 +16,7 @@ const RegisterIntentSchema = z.object({
     .regex(/@gmail\.com$/i, 'Only Gmail addresses are accepted'),
   phone: z
     .string()
-    .regex(/^\+[1-9]\d{6,14}$/, 'Phone must be in E.164 format (e.g. +14155551234)'),
+    .min(10, 'Phone must be a valid number'),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
@@ -55,41 +54,49 @@ export async function POST(request: NextRequest) {
     const rounds = parseInt(process.env.BCRYPT_ROUNDS ?? '12', 10)
     const passwordHash = await bcrypt.hash(password, rounds)
 
-    // Check Twilio credentials are configured and not placeholders
-    const accountSid = process.env.TWILIO_ACCOUNT_SID
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID
+    // Dispatch OTP via Email Service
+    try {
+      const response = await fetch('https://otp-service-beta.vercel.app/api/otp/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          type: 'numeric',
+          organization: 'CyberGuardian',
+          subject: 'CyberGuardian OTP Verification'
+        })
+      })
+      
+      if (!response.ok) {
+        throw new Error('Email service returned an error')
+      }
+    } catch (error: unknown) {
+      console.error('[register-intent] Email verification dispatch failed:', error)
+      const registrationPayload = Buffer.from(
+        JSON.stringify({ name, email, phone, passwordHash, issuedAt: Date.now(), attempts: 0, bypassOtp: true })
+      ).toString('base64')
 
-    const isPlaceholder = (v?: string) =>
-      !v || v.includes('your_') || v.includes('_here') || v.trim() === ''
+      const cookieHeader = serialize('registration_intent', registrationPayload, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 60 * 15, // 15 minutes — enough to complete OTP flow
+      })
 
-    if (isPlaceholder(accountSid) || isPlaceholder(authToken) || isPlaceholder(serviceSid)) {
-      console.error('[register-intent] Twilio credentials are missing or still set to placeholder values')
       return NextResponse.json(
-        { success: false, error: 'OTP service is not configured. Please contact support.' },
-        { status: 503 }
+        { success: true, message: 'OTP bypassed due to service constraint.', isBypass: true },
+        {
+          status: 200,
+          headers: { 'Set-Cookie': cookieHeader },
+        }
       )
     }
 
-    // Dispatch OTP via Twilio Verify
-    const client = twilio(accountSid, authToken)
-    let bypassOtp = false
-    try {
-      await client.verify.v2.services(serviceSid).verifications.create({
-        to: phone,
-        channel: 'sms',
-      })
-    } catch (twilioError: unknown) {
-      const err = twilioError as { code?: number; message?: string; status?: number; moreInfo?: string }
-      console.error('[register-intent] Twilio verification dispatch failed:', err.message)
-      console.warn('[register-intent] Falling back to Demo Bypass Mode (Code: 123456) for local development testing.')
-      bypassOtp = true
-    }
-
-    // Store registration context in an HTTP-only cookie (base64 encoded, not encrypted 
-    // to avoid runtime dependencies — rely on HttpOnly + Secure + SameSite for protection)
     const registrationPayload = Buffer.from(
-      JSON.stringify({ name, email, phone, passwordHash, bypassOtp, issuedAt: Date.now() })
+      JSON.stringify({ name, email, phone, passwordHash, issuedAt: Date.now(), attempts: 0 })
     ).toString('base64')
 
     const cookieHeader = serialize('registration_intent', registrationPayload, {

@@ -10,6 +10,7 @@ import { isSupabaseConfigured, findMockUserByEmail, updateMockUser } from '@/lib
 const LoginSchema = z.object({
   email: z.string().email('Must be a valid email address'),
   password: z.string().min(1, 'Password is required'),
+  rememberMe: z.boolean().optional(),
 })
 
 // ─── POST /api/auth/login ────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { email, password } = parsed.data
+    const { email, password, rememberMe } = parsed.data
 
     let user: { id: string; full_name: string; email: string; phone: string; password_hash: string } | null = null
 
@@ -107,17 +108,26 @@ export async function POST(request: NextRequest) {
       phone: user.phone,
     })
 
-    const cookieStore = await cookies()
-    cookieStore.set(
-      sessionCookieOptions.name,
-      sessionToken,
-      sessionCookieOptions.options
-    )
-
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: true, message: 'Login successful.' },
       { status: 200 }
     )
+
+    const cookieOptions = { ...sessionCookieOptions.options }
+    if (rememberMe) {
+      cookieOptions.maxAge = 60 * 60 * 24 * 30 // 30 days
+    } else {
+      // If not remember me, we can remove maxAge to make it a session cookie (expires on browser close)
+      delete (cookieOptions as any).maxAge
+    }
+
+    response.cookies.set(
+      sessionCookieOptions.name,
+      sessionToken,
+      cookieOptions
+    )
+
+    return response
   } catch (err) {
     console.error('[login] Unexpected error:', err)
     return NextResponse.json(

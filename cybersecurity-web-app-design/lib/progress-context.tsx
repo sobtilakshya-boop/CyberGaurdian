@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react'
 import { chapters, TOTAL_COURSE_XP } from '@/data/courseData'
+import { sectors } from '@/data/sectorsData'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface ChapterProgress {
@@ -13,6 +14,19 @@ export interface ChapterProgress {
   completedAt?: string       // ISO date
 }
 
+export interface SectorActivityProgress {
+  id: string
+  completed: boolean
+  score?: number
+}
+
+export interface SectorProgressState {
+  sectorId: string
+  progressPercentage: number
+  completedActivities: string[]
+  isCompleted: boolean
+}
+
 export interface UserProgress {
   userId: string
   xp: number
@@ -21,6 +35,7 @@ export interface UserProgress {
   badges: string[]
   chapterProgress: Record<number, ChapterProgress>
   lastUnlockedChapter: number // highest chapter that just unlocked (for animation)
+  sectorProgress: Record<string, SectorProgressState>
 }
 
 interface ProgressContextValue {
@@ -57,6 +72,7 @@ function createInitialProgress(userId: string): UserProgress {
     badges: [],
     chapterProgress: {},
     lastUnlockedChapter: 0,
+    sectorProgress: {},
   }
 }
 
@@ -222,28 +238,61 @@ export function ProgressProvider({ userId, children }: { userId: string; childre
     return createInitialProgress(userId)
   })
 
-  // Hydrate from localStorage on mount
+  // Hydrate from API and fallback to localStorage on mount
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_PREFIX + userId)
-      if (raw) {
-        const parsed = JSON.parse(raw) as UserProgress
-        dispatch({ type: 'LOAD', payload: parsed })
+    let mounted = true
+    const init = async () => {
+      let loadedFromLocal = false
+      try {
+        const raw = localStorage.getItem(STORAGE_PREFIX + userId)
+        if (raw) {
+          const parsed = JSON.parse(raw) as UserProgress
+          if (mounted) {
+            dispatch({ type: 'LOAD', payload: parsed })
+            loadedFromLocal = true
+          }
+        }
+      } catch {
+        // local storage error
       }
-    } catch {
-      // localStorage unavailable (SSR / incognito) — use defaults
+
+      try {
+        const res = await fetch('/api/progress')
+        const data = await res.json()
+        if (data.success && data.progress && mounted) {
+          dispatch({ type: 'LOAD', payload: data.progress })
+        }
+      } catch {
+        // API error, stick with local or default
+      }
+      
+      if (mounted) {
+        dispatch({ type: 'TOUCH_STREAK' })
+      }
     }
-    // Touch streak on first load of the day
-    dispatch({ type: 'TOUCH_STREAK' })
+    init()
+    return () => { mounted = false }
   }, [userId])
 
-  // Persist to localStorage on every state change
+  // Persist to localStorage and API on every state change
   useEffect(() => {
+    // 1. Instant local persistence
     try {
       localStorage.setItem(STORAGE_PREFIX + userId, JSON.stringify(progress))
     } catch {
       // Fail silently
     }
+
+    // 2. Debounced API persistence (so rapid clicks don't spam the DB)
+    const timer = setTimeout(() => {
+      fetch('/api/progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress })
+      }).catch(() => {}) // Fail silently in background
+    }, 1500)
+
+    return () => clearTimeout(timer)
   }, [progress, userId])
 
   // ── Computed helpers ──────────────────────────────────────────────────────
@@ -265,19 +314,33 @@ export function ProgressProvider({ userId, children }: { userId: string; childre
   }, [progress])
 
   const getOverallPercent = useCallback((): number => {
-    const totalSteps = chapters.length * 4 // reading, videos, comicQuiz, chapterQuiz
+    let totalSteps = chapters.length * 4 // reading, videos, comicQuiz, chapterQuiz
     let completedSteps = 0
+
     for (const cp of Object.values(progress.chapterProgress)) {
       if (cp.readingDone) completedSteps++
       if (cp.videosDone) completedSteps++
       if (cp.comicQuizPassed) completedSteps++
       if (cp.chapterQuizPassed) completedSteps++
     }
-    return Math.round((completedSteps / totalSteps) * 100)
+
+    // Add sector progress steps
+    for (const sector of sectors) {
+      const sectorActivitiesCount = sector.activities?.length || 0
+      totalSteps += sectorActivitiesCount
+      const sp = progress.sectorProgress?.[sector.id]
+      if (sp && sp.completedActivities) {
+        completedSteps += sp.completedActivities.length
+      }
+    }
+
+    return totalSteps === 0 ? 0 : Math.round((completedSteps / totalSteps) * 100)
   }, [progress])
 
   const getCompletedCount = useCallback((): number => {
-    return Object.values(progress.chapterProgress).filter(isChapterFullyComplete).length
+    const completedChapters = Object.values(progress.chapterProgress).filter(isChapterFullyComplete).length
+    const completedSectors = Object.values(progress.sectorProgress || {}).filter(sp => sp.isCompleted).length
+    return completedChapters + completedSectors
   }, [progress])
 
   // ── Mutating actions ──────────────────────────────────────────────────────

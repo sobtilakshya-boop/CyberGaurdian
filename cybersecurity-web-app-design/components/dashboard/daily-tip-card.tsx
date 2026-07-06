@@ -72,9 +72,9 @@ export default function DailyTipCard() {
       transition={{ duration: 0.45, delay: 0.3 }}
       className="rounded-2xl overflow-hidden"
       style={{
-        background: 'rgba(255,255,255,0.90)',
+        background: 'var(--db-surface)',
         border: '1px solid var(--db-border)',
-        boxShadow: 'var(--db-shadow-md)',
+        boxShadow: 'var(--db-shadow-sm)',
       }}
     >
       {/* Header */}
